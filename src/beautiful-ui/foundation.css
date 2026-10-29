@@ -1,0 +1,51 @@
+/* Selected Beautiful UI foundation tokens for the vendored primitives.
+   MIT License, © 2026 Shane Levine; see ../../BEAUTIFUL_UI_LICENSE.txt. */
+@import "tailwindcss";
+
+:root {
+  --surface: #fff;
+  --inset: #f8f9fb;
+  --hover: #f2f4f8;
+  --ink: #252a33;
+  --ink-2: #69717f;
+  --ink-3: #929aa6;
+  --line: #e9ebf0;
+  --line-strong: #dce0e8;
+  --accent: #347df0;
+  --accent-ink: #2869d4;
+  --green: #2d9069;
+  --green-tint: #edf8f1;
+  --orange: #a97a2e;
+  --red: #c65752;
+  --red-tint: #fef1f0;
+  --shadow-card: 0 0 0 1px var(--line), 0 2px 5px rgba(30,41,59,.035), 0 12px 30px rgba(30,41,59,.025);
+  --shadow-btn: 0 0 0 1px var(--line-strong), 0 1px 2px rgba(30,41,59,.05);
+}
+
+@theme inline {
+  --color-surface: var(--surface);
+  --color-inset: var(--inset);
+  --color-hover: var(--hover);
+  --color-ink: var(--ink);
+  --color-ink-2: var(--ink-2);
+  --color-ink-3: var(--ink-3);
+  --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
+  --color-accent: var(--accent);
+  --color-accent-ink: var(--accent-ink);
+  --color-green: var(--green);
+  --color-green-tint: var(--green-tint);
+  --color-orange: var(--orange);
+  --color-red: var(--red);
+  --color-red-tint: var(--red-tint);
+  --radius-card: 10px;
+  --shadow-card: var(--shadow-card);
+  --shadow-btn: var(--shadow-btn);
+}
+
+.primitive-card-bar { min-height: 39px; padding: 0 12px; }
+@keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes fade-up { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; }
+}

@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import type { TeachingCase } from '../types'
 import { generateTeachingCase } from '../api'
+import { LoadingDots } from './LoadingDots'
 
 interface Props {
   sessionId: string
@@ -36,6 +37,8 @@ export function TeachingCaseView({ sessionId }: Props) {
           {busy ? '生成中…' : caseData ? '换一个案例' : '生成案例'}
         </button>
       </div>
+
+      {busy && <LoadingDots text="正在生成教学案例" />}
 
       {caseData && (
         <div className="case-content">

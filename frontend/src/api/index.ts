@@ -47,6 +47,10 @@ export function getSession(sessionId: string): Promise<ReviewSession> {
   return request(`/sessions/${sessionId}`)
 }
 
+export function listSessions(): Promise<ReviewSession[]> {
+  return request('/sessions')
+}
+
 export function listMaterials(sessionId: string): Promise<MaterialMeta[]> {
   return request(`/sessions/${sessionId}/materials`)
 }

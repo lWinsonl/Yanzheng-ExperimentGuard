@@ -64,6 +64,12 @@ class RuleBase(ABC):
 
 def get_rules_for(experiment_type: ExperimentType) -> list[RuleBase]:
     """按实验类型返回规则集。"""
+    from app.rules.algorithm_system_rules import (
+        BaselineCheckRule as ASBaselineCheckRule,
+        MetricCheckRule as ASMetricCheckRule,
+        PlanExecutionCoverageRule,
+        StabilityRepetitionRule,
+    )
     from app.rules.data_model_rules import (
         BaselineCheckRule,
         ClaimGeneralizationRule,
@@ -73,10 +79,16 @@ def get_rules_for(experiment_type: ExperimentType) -> list[RuleBase]:
     )
 
     all_rules: list[RuleBase] = [
+        # 数据与模型实验
         SplitConsistencyRule(),
         ClaimGeneralizationRule(),
         RepetitionCheckRule(),
         BaselineCheckRule(),
         MetricCheckRule(),
+        # 算法与系统性能实验
+        ASBaselineCheckRule(),
+        ASMetricCheckRule(),
+        StabilityRepetitionRule(),
+        PlanExecutionCoverageRule(),
     ]
     return [r for r in all_rules if r.experiment_type == experiment_type]

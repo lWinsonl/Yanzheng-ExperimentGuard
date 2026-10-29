@@ -212,6 +212,95 @@ def test_recheck_resolves_contradiction():
     assert by_rule["dm_split_consistency"].resolved, "修改后划分矛盾应解除"
 
 
+# ---------- 算法与系统性能实验规则测试 ----------
+
+AS_CLAIM = "新算法 A 比基线 B 更快,且更稳定。"
+
+
+def _setup_as(claim: str = AS_CLAIM):
+    session = evidence_chain.create_session(
+        title="算法实验测试", experiment_type="algorithm_system", claim_texts=[claim]
+    )
+    return session
+
+
+def test_as_baseline_missing_insufficient():
+    """算法实验:主张含比较但无基线信息 -> 信息不足。"""
+    session = _setup_as()
+    evidence_chain.extract_from_text(
+        session.session_id,
+        "实验计划:测试算法 A 的延迟与吞吐。评价指标 latency、throughput。",
+        "plan.md",
+        "plan",
+    )
+    _confirm_all(session.session_id)
+    report = review_service.run_review(session.session_id)
+    levels = {f.rule_id: f.level for f in report.findings}
+    assert levels.get("as_baseline_check") == FindingLevel.INSUFFICIENT, (
+        f"缺基线应标信息不足,实际:{levels}"
+    )
+
+
+def test_as_stability_seed_only_risk():
+    """算法实验:主张'更稳定'但只有随机种子(单次运行)-> 潜在风险。"""
+    session = _setup_as()
+    evidence_chain.extract_from_text(
+        session.session_id,
+        "实验计划:对比算法 A 与基线 B,指标 latency,基线 B 为 FIFO。",
+        "plan.md",
+        "plan",
+    )
+    evidence_chain.extract_from_text(
+        session.session_id,
+        "np.random.seed(42)\nlatency_a = 12.3\nlatency_b = 15.6\n",
+        "bench.py",
+        "execution",
+    )
+    _confirm_all(session.session_id)
+    report = review_service.run_review(session.session_id)
+    levels = {f.rule_id: f.level for f in report.findings}
+    assert levels.get("as_stability_repetition") == FindingLevel.RISK, (
+        f"只有种子无多次运行应标风险,实际:{levels}"
+    )
+
+
+def test_as_clean_case_no_false_positive():
+    """算法实验:计划+执行+基线+指标+多次运行齐全 -> 稳定性规则不误报。"""
+    session = _setup_as()
+    evidence_chain.extract_from_text(
+        session.session_id,
+        "实验计划:对比算法 A 与基线 B(FIFO),指标 latency、throughput,重复 5 次报告均值±标准差。",
+        "plan.md",
+        "plan",
+    )
+    evidence_chain.extract_from_text(
+        session.session_id,
+        "baseline = FIFO()\n"
+        "latency_a = 12.3 ± 0.8\nlatency_b = 15.6 ± 1.2\n"
+        "n_runs = 5\n",
+        "bench.py",
+        "execution",
+    )
+    _confirm_all(session.session_id)
+    report = review_service.run_review(session.session_id)
+    levels = {f.rule_id: f.level for f in report.findings}
+    assert "as_stability_repetition" not in levels, (
+        f"多次运行证据齐全时稳定性规则不应触发,实际:{levels}"
+    )
+    assert "as_plan_exec_coverage" not in levels, "计划+执行齐全时覆盖规则不应触发"
+
+
+def test_as_no_materials_coverage_insufficient():
+    """算法实验:无任何材料 -> 覆盖规则报信息不足(不再产出空报告)。"""
+    session = _setup_as()
+    report = review_service.run_review(session.session_id)
+    rule_ids = {f.rule_id for f in report.findings}
+    assert "as_plan_exec_coverage" in rule_ids, (
+        f"无材料时应触发覆盖规则,实际:{rule_ids}"
+    )
+    assert len(report.findings) > 0, "algorithm_system 不应产出空报告"
+
+
 if __name__ == "__main__":
     test_flawed_case_split_contradiction()
     test_flawed_case_stability_single_run()
@@ -219,4 +308,8 @@ if __name__ == "__main__":
     test_insufficient_case_no_baseline()
     test_insufficient_case_only_plan_no_execution()
     test_recheck_resolves_contradiction()
+    test_as_baseline_missing_insufficient()
+    test_as_stability_seed_only_risk()
+    test_as_clean_case_no_false_positive()
+    test_as_no_materials_coverage_insufficient()
     print("审查规则测试全部通过(漏报与误报检测通过)")

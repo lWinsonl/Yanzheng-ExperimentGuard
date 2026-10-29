@@ -2,6 +2,7 @@ import { useState } from 'react'
 import type { DeepFinding } from '../types'
 import { LEVEL_COLORS, LEVEL_LABELS } from '../types'
 import { deepReview } from '../api'
+import { LoadingDots } from './LoadingDots'
 
 interface Props {
   sessionId: string
@@ -35,7 +36,8 @@ export function DeepReviewPanel({ sessionId }: Props) {
           {busy ? '复核中…' : loaded ? '重新复核' : '运行模型复核'}
         </button>
       </div>
-      {loaded && findings.length === 0 && (
+      {busy && <LoadingDots text="模型正在复核复杂上下文" />}
+      {loaded && !busy && findings.length === 0 && (
         <div className="muted">
           模型未发现规则之外的问题(或未接入模型,此功能需要配置 LLM)。
         </div>

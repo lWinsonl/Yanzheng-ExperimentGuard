@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import type { GapAnalysis, IngestResponse, MaterialMeta, MaterialRole } from '../types'
 import { addTextMaterial, analyzeGaps, listMaterials, uploadFile } from '../api'
+import { DEMO_EXECUTION, DEMO_PLAN } from '../demo-data'
 
 interface Props {
   sessionId: string
@@ -57,6 +58,13 @@ function UploadArea({
     }
   }
 
+  function loadDemo() {
+    setPasteMode(true)
+    setPasteName(isPlan ? 'plan.md' : 'train.py')
+    setPasteContent(isPlan ? DEMO_PLAN : DEMO_EXECUTION)
+    setError('')
+  }
+
   return (
     <div className={`upload-area ${role}`}>
       <div className="upload-area-header">
@@ -79,6 +87,9 @@ function UploadArea({
         </button>
         <button disabled={busy} onClick={() => setPasteMode(!pasteMode)}>
           {pasteMode ? '收起粘贴框' : '粘贴文本内容'}
+        </button>
+        <button disabled={busy} onClick={loadDemo} title="一键填入演示材料">
+          加载示例材料
         </button>
         <input
           ref={fileRef}

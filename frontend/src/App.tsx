@@ -1,5 +1,6 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import type { ReviewSession } from './types'
+import { getSession } from './api'
 import { SetupPage } from './pages/SetupPage'
 import { UploadPage } from './pages/UploadPage'
 import { FactConfirmPage } from './pages/FactConfirmPage'
@@ -16,9 +17,50 @@ const STEPS: { key: Step; label: string }[] = [
   { key: 'recheck', label: '修改复查' },
 ]
 
+const SESSION_KEY = 'yanzheng_session'
+const STEP_KEY = 'yanzheng_step'
+
+function loadSession(): ReviewSession | null {
+  try {
+    const raw = localStorage.getItem(SESSION_KEY)
+    return raw ? (JSON.parse(raw) as ReviewSession) : null
+  } catch {
+    return null
+  }
+}
+
+function loadStep(): Step {
+  const raw = localStorage.getItem(STEP_KEY)
+  return (raw as Step) || 'setup'
+}
+
 export default function App() {
-  const [step, setStep] = useState<Step>('setup')
-  const [session, setSession] = useState<ReviewSession | null>(null)
+  const [step, setStep] = useState<Step>(loadStep)
+  const [session, setSession] = useState<ReviewSession | null>(loadSession)
+
+  // 持久化:session / step 变化时写入 localStorage
+  useEffect(() => {
+    if (session) localStorage.setItem(SESSION_KEY, JSON.stringify(session))
+    else localStorage.removeItem(SESSION_KEY)
+  }, [session])
+  useEffect(() => {
+    localStorage.setItem(STEP_KEY, step)
+  }, [step])
+
+  // 恢复时校验会话在后端是否仍存在,不存在则清空
+  useEffect(() => {
+    const restored = loadSession()
+    if (!restored) return
+    getSession(restored.session_id).then(setSession).catch(() => {
+      setSession(null)
+      setStep('setup')
+    })
+  }, [])
+
+  function startNew() {
+    setSession(null)
+    setStep('setup')
+  }
 
   const claimTexts: Record<string, string> = {}
   if (session) {
@@ -40,6 +82,11 @@ export default function App() {
         <p className="tagline">
           审查你的研究结论能否被实验支持 —— 主张、计划与执行逐项对照
         </p>
+        {session && (
+          <button className="new-session-btn" onClick={startNew}>
+            新建审查
+          </button>
+        )}
       </header>
 
       <nav className="stepper">
@@ -64,6 +111,10 @@ export default function App() {
           <SetupPage
             onCreated={(s) => setSession(s)}
             onNext={() => setStep('upload')}
+            onOpenSession={(s) => {
+              setSession(s)
+              setStep('upload')
+            }}
           />
         )}
         {step === 'upload' && session && (
@@ -83,6 +134,7 @@ export default function App() {
         {step === 'report' && session && (
           <ReportPage
             sessionId={session.session_id}
+            title={session.title}
             claimTexts={claimTexts}
             onBack={() => setStep('facts')}
             onNext={() => setStep('recheck')}

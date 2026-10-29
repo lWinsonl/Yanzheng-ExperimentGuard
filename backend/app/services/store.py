@@ -57,6 +57,26 @@ class DataStore:
         self._sessions: dict[str, SessionStore] = {}
         self._data_dir = Path(settings.data_dir)
         self._data_dir.mkdir(parents=True, exist_ok=True)
+        self._restore()
+
+    def _restore(self) -> None:
+        """启动时从 JSON 文件恢复历史会话(崩溃/重启后可继续)。"""
+        for path in sorted(self._data_dir.glob("*.json")):
+            try:
+                payload = json.loads(path.read_text(encoding="utf-8"))
+                session = ReviewSession.model_validate(payload["session"])
+                store = SessionStore(session)
+                for k, v in payload.get("docs", {}).items():
+                    store.docs[k] = ParsedDocument.model_validate(v)
+                for k, v in payload.get("facts", {}).items():
+                    store.facts[k] = ExtractedFact.model_validate(v)
+                for k, v in payload.get("reports", {}).items():
+                    store.reports[k] = ReviewReport.model_validate(v)
+                for k, v in payload.get("rechecks", {}).items():
+                    store.rechecks[k] = RecheckResult.model_validate(v)
+                self._sessions[session.session_id] = store
+            except Exception:  # noqa: BLE001
+                continue  # 损坏文件跳过,不阻断启动
 
     def create_session(self, session: ReviewSession) -> SessionStore:
         store = SessionStore(session)

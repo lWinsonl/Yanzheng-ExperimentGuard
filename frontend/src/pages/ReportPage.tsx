@@ -1,13 +1,15 @@
 import { useEffect, useState } from 'react'
 import type { Finding, Followup, ReviewReport } from '../types'
-import { LEVEL_LABELS } from '../types'
+import { CATEGORY_LABELS, LEVEL_LABELS } from '../types'
 import { generateFollowups, runReview } from '../api'
 import { FindingCard } from '../components/FindingCard'
 import { DeepReviewPanel } from '../components/DeepReviewPanel'
 import { TeachingCaseView } from '../components/TeachingCaseView'
+import { LoadingDots } from '../components/LoadingDots'
 
 interface Props {
   sessionId: string
+  title: string
   claimTexts: Record<string, string>
   onNext: () => void
   onBack: () => void
@@ -16,7 +18,7 @@ interface Props {
 /** 第四步:审查报告。发现按严重度分组,每条均可回溯原文。
  * 信息不足时自动展开追问;底部给教学案例训练实验设计能力。
  */
-export function ReportPage({ sessionId, claimTexts, onNext, onBack }: Props) {
+export function ReportPage({ sessionId, title, claimTexts, onNext, onBack }: Props) {
   const [report, setReport] = useState<ReviewReport | null>(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
@@ -34,7 +36,9 @@ export function ReportPage({ sessionId, claimTexts, onNext, onBack }: Props) {
     }
   }
 
+  // 首次进入报告页时自动运行审查(已有报告时不重复运行)
   useEffect(() => {
+    if (report) return
     run()
   }, [])
 
@@ -57,6 +61,62 @@ export function ReportPage({ sessionId, claimTexts, onNext, onBack }: Props) {
     return acc
   }, {})
 
+  /** 导出审查报告为 Markdown 文件 */
+  function exportMarkdown() {
+    if (!report) return
+    const lines: string[] = []
+    lines.push(`# 审查报告${title ? ':' + title : ''}`)
+    lines.push('')
+    lines.push(`- 生成时间:${new Date(report.created_at).toLocaleString('zh-CN')}`)
+    lines.push(`- 可用事实:${report.usable_fact_count}`)
+    lines.push(`- 未确认/校验失败跳过:${report.skipped_fact_count}`)
+    lines.push(`- 发现总计:${report.findings.length}`)
+    if (followups.length > 0) {
+      lines.push('')
+      lines.push('## 智能体追问(待补充信息)')
+      followups.forEach((f) => {
+        lines.push(`- **${f.question}**`)
+        if (f.what_to_provide) lines.push(`  - 请提供:${f.what_to_provide}`)
+      })
+    }
+    for (const level of order) {
+      const findings = grouped[level] ?? []
+      if (findings.length === 0) continue
+      lines.push('')
+      lines.push(`## ${LEVEL_LABELS[level]}(${findings.length})`)
+      lines.push('')
+      findings.forEach((f, i) => {
+        lines.push(`### ${i + 1}. ${f.title}`)
+        lines.push('')
+        lines.push(`- **规则**:${f.rule_id}`)
+        if (f.claim_ids.length > 0) {
+          const claims = f.claim_ids.map((cid) => claimTexts[cid] ?? cid).join('; ')
+          lines.push(`- **涉及主张**:${claims}`)
+        }
+        if (f.evidence.length > 0) {
+          lines.push(`- **依据**:`)
+          f.evidence.forEach((e) => {
+            lines.push(`  - [${CATEGORY_LABELS[e.category] ?? e.category}] ${e.value}`)
+            if (e.source?.snippet) lines.push(`    > "${e.source.snippet}"`)
+          })
+        }
+        if (f.missing_evidence.length > 0) {
+          lines.push(`- **缺少证据**:${f.missing_evidence.join('; ')}`)
+        }
+        lines.push(`- **建议**:${f.suggestion}`)
+        lines.push(`- **推理**:${f.reasoning}`)
+        lines.push('')
+      })
+    }
+    const blob = new Blob([lines.join('\n')], { type: 'text/markdown;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `审查报告-${title || sessionId}.md`
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
   return (
     <div className="page">
       <h2>第四步:审查报告</h2>
@@ -66,7 +126,7 @@ export function ReportPage({ sessionId, claimTexts, onNext, onBack }: Props) {
       </p>
 
       {error && <div className="error">{error}</div>}
-      {busy && <div className="muted">审查运行中…</div>}
+      {busy && <LoadingDots text="正在运行学科规则审查" />}
 
       {report && (
         <>
@@ -144,6 +204,9 @@ export function ReportPage({ sessionId, claimTexts, onNext, onBack }: Props) {
         <button onClick={onBack}>上一步</button>
         <button onClick={() => run()} disabled={busy}>
           重新审查
+        </button>
+        <button onClick={exportMarkdown} disabled={!report}>
+          导出 Markdown
         </button>
         <button className="primary" onClick={onNext} disabled={!report}>
           下一步:修改后复查

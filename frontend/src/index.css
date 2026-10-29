@@ -26,8 +26,9 @@ body {
   padding: 24px 16px 48px;
 }
 
-.app-header { text-align: center; margin-bottom: 20px; }
+.app-header { text-align: center; margin-bottom: 20px; position: relative; }
 .app-header h1 { font-size: 28px; letter-spacing: 2px; }
+.new-session-btn { position: absolute; top: 0; right: 0; font-size: 13px; padding: 4px 12px; }
 .tagline { color: var(--muted); font-size: 14px; }
 
 /* 步骤导航 */
@@ -133,6 +134,22 @@ button.primary:hover:not(:disabled) { background: #1765cc; }
 .role-tag { padding: 2px 8px; border-radius: 4px; font-size: 12px; font-weight: 600; }
 .role-tag.plan { background: #e8f0fe; color: var(--primary); }
 .role-tag.execution { background: #fef7e0; color: var(--warn); }
+
+/* 加载指示器(LLM 调用等待) */
+.loading-indicator { display: inline-flex; align-items: center; gap: 5px; color: var(--muted); font-size: 14px; }
+.loading-indicator .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--primary); animation: loading-pulse 1.2s infinite ease-in-out; }
+.loading-indicator .dot:nth-child(2) { animation-delay: 0.2s; }
+.loading-indicator .dot:nth-child(3) { animation-delay: 0.4s; }
+.loading-indicator .dot:nth-child(4) { animation-delay: 0.6s; }
+@keyframes loading-pulse { 0%, 80%, 100% { opacity: 0.25; transform: scale(0.7); } 40% { opacity: 1; transform: scale(1); } }
+
+/* 历史会话列表 */
+.session-history { margin-top: 24px; text-align: left; }
+.session-history h4 { margin-bottom: 8px; }
+.session-history-item { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border: 1px solid var(--border); border-radius: var(--radius); margin-bottom: 6px; cursor: pointer; background: #fff; transition: border-color 0.15s; }
+.session-history-item:hover { border-color: var(--primary); background: #f8fbff; }
+.session-history-title { font-weight: 600; font-size: 14px; flex: 1; }
+.session-history-meta { font-size: 12px; color: var(--muted); }
 
 /* 上传区域(计划/执行双列) */
 .upload-areas { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin: 16px 0; }

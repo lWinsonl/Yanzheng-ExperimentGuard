@@ -1,4 +1,27 @@
+# 依赖
 node_modules/
+__pycache__/
+*.egg-info/
+.pytest_cache/
+
+# 构建产物
 dist/
-experiment-guard-assets/
+build/
+
+# 环境配置（含密钥）
 .env
+.env.*
+!.env.example
+.venv/
+venv/
+
+# 本地数据（会话文件）
+data/
+
+# IDE
+.vscode/
+.idea/
+.joycode/
+
+# 日志
+*.log

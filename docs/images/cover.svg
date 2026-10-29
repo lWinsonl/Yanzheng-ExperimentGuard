@@ -1,0 +1,46 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="440" viewBox="0 0 1280 440" role="img" aria-labelledby="title desc">
+  <title id="title">研证 ExperimentGuard</title>
+  <desc id="desc">让研究主张、实验计划与执行证据对应起来。科研训练中的实验审查助手。</desc>
+  <defs>
+    <pattern id="grid" width="28" height="28" patternUnits="userSpaceOnUse"><path d="M28 0H0V28" fill="none" stroke="#dce7f6" stroke-width=".6"/></pattern>
+    <linearGradient id="paper" x2="1" y2=".6"><stop stop-color="#f5f9ff"/><stop offset="1" stop-color="#edf4ff"/></linearGradient>
+  </defs>
+  <rect width="1280" height="440" rx="22" fill="url(#paper)"/>
+  <rect x="674" width="606" height="440" fill="url(#grid)"/>
+  <path d="M0 22A22 22 0 0 1 22 0H1258A22 22 0 0 1 1280 22" fill="none" stroke="#1765cc" stroke-width="6"/>
+  <g font-family="Segoe UI,Microsoft YaHei,Arial,sans-serif">
+    <rect x="52" y="50" width="44" height="44" rx="12" fill="#1765cc"/>
+    <path d="M64 63h19m-19 8h12m-12 8h8m7-2 4 4 7-10" fill="none" stroke="white" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+    <text x="112" y="79" font-size="22" font-weight="600" fill="#25466e">ExperimentGuard</text>
+    <text x="50" y="192" font-size="78" font-weight="700" fill="#122447">研证</text>
+    <text x="54" y="246" font-size="28" font-weight="600" fill="#122447">让研究结论，经得起证据核对。</text>
+    <text x="55" y="287" font-size="18" fill="#526988">科研训练中的实验审查助手</text>
+    <path d="M55 320H601" stroke="#ccdcee"/>
+    <g font-size="15" fill="#49617f">
+      <text x="55" y="352">原文可追溯</text><text x="235" y="352">事实由人确认</text><text x="439" y="352">修改后再复查</text>
+    </g>
+    <g transform="translate(710 48)">
+      <path d="M32 94v197h36M32 188h36" fill="none" stroke="#b9cee9" stroke-width="2"/>
+      <circle cx="32" cy="94" r="6" fill="#1765cc"/>
+      <g>
+        <rect x="0" y="0" width="496" height="104" rx="12" fill="white" stroke="#cfddf0"/>
+        <rect x="0" y="0" width="5" height="104" rx="2" fill="#1765cc"/>
+        <text x="24" y="31" font-size="14" fill="#1765cc" font-weight="600">研究主张</text>
+        <text x="24" y="65" font-size="22" fill="#122447" font-weight="600">模型能预测新设备的故障</text>
+      </g>
+      <g transform="translate(68 134)">
+        <rect width="428" height="92" rx="12" fill="white" stroke="#cfddf0"/>
+        <text x="22" y="29" font-size="14" fill="#11858b" font-weight="600">实验计划</text>
+        <text x="22" y="62" font-size="20" fill="#122447">按设备划分训练集与测试集</text>
+      </g>
+      <g transform="translate(68 248)">
+        <rect width="428" height="92" rx="12" fill="white" stroke="#e2c68e"/>
+        <text x="22" y="29" font-size="14" fill="#9a671a" font-weight="600">执行证据 · 待核对</text>
+        <text x="22" y="62" font-size="20" fill="#122447">代码使用了普通随机划分</text>
+      </g>
+      <circle cx="32" cy="188" r="5" fill="#11858b"/>
+      <circle cx="32" cy="291" r="5" fill="#b67a18"/>
+    </g>
+    <text x="1205" y="408" text-anchor="end" font-size="12" fill="#6c80a0">主张 / 计划 / 执行</text>
+  </g>
+</svg>

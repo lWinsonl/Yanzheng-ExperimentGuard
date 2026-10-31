@@ -15,7 +15,10 @@ class Settings(BaseSettings):
     # 存储目录(骨架阶段用 JSON 文件持久化)
     data_dir: str = "./data"
 
-    # 允许的来源(前端开发服务器)
+    # 前端构建产物目录(生产单容器部署时由后端同源托管;本地开发该目录不存在则不托管)
+    static_dir: str = "./static"
+
+    # 允许的来源(前端开发服务器;生产同源部署不触发 CORS)
     cors_origins: list[str] = ["http://localhost:5173"]
 
     model_config = {"env_file": ".env", "env_file_encoding": "utf-8"}

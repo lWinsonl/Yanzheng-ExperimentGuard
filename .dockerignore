@@ -1,0 +1,20 @@
+# 密钥不进镜像,由托管平台的环境变量注入
+.env
+.env.*
+**/.env
+**/.env.*
+
+# 本地运行数据(会话 JSON),容器内按需重建
+backend/data/
+
+# 前端依赖与本地构建产物(阶段1重新构建)
+frontend/node_modules/
+frontend/dist/
+
+# 缓存 / 测试 / 文档,镜像不需要
+**/__pycache__/
+*.pyc
+backend/.pytest_cache/
+.git/
+.joycode/
+docs/

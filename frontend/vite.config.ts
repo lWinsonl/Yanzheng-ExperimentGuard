@@ -9,7 +9,7 @@ export default defineConfig({
     proxy: {
       // 前端开发服务器代理 /api 到后端,避免跨域
       '/api': {
-        target: 'http://127.0.0.1:8001',
+        target: 'http://127.0.0.1:8002',
         changeOrigin: true,
       },
     },

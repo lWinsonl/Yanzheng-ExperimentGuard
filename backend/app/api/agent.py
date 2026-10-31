@@ -67,7 +67,10 @@ def deep_review(session_id: str):
     """模型复核:处理规则无法覆盖的复杂上下文(引用已校验)。"""
     try:
         result = agent_service.deep_review(session_id)
-        return {"deep_findings": [_dataclass_to_dict(f) for f in result]}
+        return {
+            "deep_findings": [_dataclass_to_dict(f) for f in result],
+            "llm_available": llm_client.is_available(),
+        }
     except KeyError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
 

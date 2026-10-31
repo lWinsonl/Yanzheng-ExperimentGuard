@@ -47,6 +47,16 @@ export function FactCard({ sessionId, fact, onConfirm }: Props) {
     <div className={`fact-card status-${fact.status}`}>
       <div className="fact-header">
         <span className="fact-category">{CATEGORY_LABELS[fact.category]}</span>
+        <span
+          className={`fact-source-badge src-${fact.extraction_source}`}
+          title={
+            fact.extraction_source === 'llm'
+              ? '由模型提取,引用已逐字校验,建议仔细核对'
+              : '由规则程序提取'
+          }
+        >
+          {fact.extraction_source === 'llm' ? '模型提取' : '规则提取'}
+        </span>
         <span className="fact-status" style={{ color: statusColor }}>
           {STATUS_LABELS[fact.status]}
         </span>

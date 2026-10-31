@@ -2,17 +2,14 @@
 
 运行:cd backend && python -m pytest tests/test_agent.py -v
 
-注:通过 autouse fixture 强制关闭 LLM,不受 .env 真实密钥影响,
-确保测试始终验证启发式降级路径。
+注:conftest.py 的全局 autouse fixture 已强制关闭 LLM,
+不受 .env 真实密钥影响,确保测试始终验证启发式降级路径。
 """
 
 from __future__ import annotations
 
 import sys
 from pathlib import Path
-from unittest.mock import patch
-
-import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
@@ -22,13 +19,6 @@ from app.services import data_store, evidence_chain, review_service
 
 
 CLAIM = "模型 A 比基线 B 更能预测新设备的故障,且更稳定。"
-
-
-@pytest.fixture(autouse=True)
-def _no_llm():
-    """强制关闭 LLM,测试启发式降级模式(不受 .env 真实密钥影响)。"""
-    with patch.object(llm_client, "is_available", return_value=False):
-        yield
 
 
 def _setup_with_materials():
@@ -58,7 +48,7 @@ def _setup_with_materials():
 
 def test_llm_unavailable_uses_heuristic():
     """LLM 不可用时,智能体明确处于启发式降级模式。"""
-    assert not llm_client.is_available(), "fixture 应已关闭 LLM"
+    assert not llm_client.is_available(), "conftest 应已关闭 LLM"
 
 
 def test_heuristic_direction_analysis():

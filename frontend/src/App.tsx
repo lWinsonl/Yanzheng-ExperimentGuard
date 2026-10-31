@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
-import type { ReviewSession } from './types'
-import { getSession } from './api'
+import type { AgentStatus, ReviewSession } from './types'
+import { getAgentStatus, getSession } from './api'
 import { SetupPage } from './pages/SetupPage'
 import { UploadPage } from './pages/UploadPage'
 import { FactConfirmPage } from './pages/FactConfirmPage'
@@ -37,6 +37,7 @@ function loadStep(): Step {
 export default function App() {
   const [step, setStep] = useState<Step>(loadStep)
   const [session, setSession] = useState<ReviewSession | null>(loadSession)
+  const [agentStatus, setAgentStatus] = useState<AgentStatus | null>(null)
 
   // 持久化:session / step 变化时写入 localStorage
   useEffect(() => {
@@ -56,6 +57,15 @@ export default function App() {
       setStep('setup')
     })
   }, [])
+
+  // 会话变化时获取智能体运行模式(模型/启发式)
+  useEffect(() => {
+    if (!session) {
+      setAgentStatus(null)
+      return
+    }
+    getAgentStatus(session.session_id).then(setAgentStatus).catch(() => {})
+  }, [session?.session_id])
 
   function startNew() {
     setSession(null)
@@ -82,6 +92,14 @@ export default function App() {
         <p className="tagline">
           审查你的研究结论能否被实验支持 —— 主张、计划与执行逐项对照
         </p>
+        {agentStatus && (
+          <span
+            className={`mode-badge ${agentStatus.mode}`}
+            title={agentStatus.note}
+          >
+            {agentStatus.mode === 'llm' ? '模型模式' : '启发式模式'}
+          </span>
+        )}
         {session && (
           <button className="new-session-btn" onClick={startNew}>
             新建审查

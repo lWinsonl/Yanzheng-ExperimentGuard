@@ -211,6 +211,9 @@ export interface DeepFinding {
   suggestion: string
   suggestion_type: string
   quote_verified: boolean
+  suggestion_action?: string
+  suggestion_reason?: string
+  suggestion_verify?: string
 }
 
 export interface TeachingCase {

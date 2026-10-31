@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import type { Finding, Followup, ReviewReport } from '../types'
+import type { DeepFinding, Finding, Followup, ReviewReport } from '../types'
 import { CATEGORY_LABELS, LEVEL_LABELS } from '../types'
 import { generateFollowups, runReview } from '../api'
 import { FindingCard } from '../components/FindingCard'
@@ -23,6 +23,7 @@ export function ReportPage({ sessionId, title, claimTexts, onNext, onBack }: Pro
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [followups, setFollowups] = useState<Followup[]>([])
+  const [deepFindings, setDeepFindings] = useState<DeepFinding[]>([])
 
   async function run() {
     setBusy(true)
@@ -77,6 +78,20 @@ export function ReportPage({ sessionId, title, claimTexts, onNext, onBack }: Pro
       followups.forEach((f) => {
         lines.push(`- **${f.question}**`)
         if (f.what_to_provide) lines.push(`  - 请提供:${f.what_to_provide}`)
+      })
+    }
+    if (deepFindings.length > 0) {
+      lines.push('')
+      lines.push('## 模型复核(详细修改建议)')
+      deepFindings.forEach((f, i) => {
+        lines.push(`### ${i + 1}. ${f.title}`)
+        lines.push('')
+        lines.push(`- **级别**:${LEVEL_LABELS[f.level] ?? f.level}`)
+        if (f.reasoning) lines.push(`- **推理**:${f.reasoning}`)
+        if (f.verified_quote) lines.push(`- **原文引用**:"${f.verified_quote}"`)
+        if (f.material_filename) lines.push(`- **来源材料**:${f.material_filename}`)
+        if (f.suggestion) lines.push(`- **建议**:${f.suggestion}`)
+        lines.push('')
       })
     }
     for (const level of order) {
@@ -185,8 +200,8 @@ export function ReportPage({ sessionId, title, claimTexts, onNext, onBack }: Pro
             </div>
           )}
 
-          {/* 模型复核:规则无法覆盖的复杂上下文 */}
-          <DeepReviewPanel sessionId={sessionId} />
+          {/* 模型复核:详细修改建议 + 规则盲区 */}
+          <DeepReviewPanel sessionId={sessionId} onFindingsChange={setDeepFindings} />
 
           {/* 教学小案例:训练实验设计能力 */}
           <div className="teaching-section">

@@ -86,8 +86,8 @@ class EvidenceChainService:
         # 规则提取(明确条件交给程序)
         for fact in self.rule_extractor.extract(doc, session_id):
             self._add_verified(store, fact, facts, dropped)
-        # 模型提取(复杂上下文,预留;未配密钥时为空)
-        for fact in self.llm_extractor.extract(doc, session_id):
+        # 模型提取(复杂上下文;未配密钥时降级跳过,与规则提取重叠的自动去重)
+        for fact in self.llm_extractor.extract(doc, session_id, existing_facts=facts):
             self._add_verified(store, fact, facts, dropped)
 
         if doc.ocr_required:

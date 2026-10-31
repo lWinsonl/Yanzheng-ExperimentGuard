@@ -20,6 +20,35 @@ from app.models.evidence import (
 
 _MATCH_CONTEXT = 80  # 锚点上下文扩展字符数,让片段包含足够语义
 
+# 指标同义词归并表:同一指标的不同写法视为同一事实,避免一条材料出多条 f1
+_METRIC_SYNONYMS = {
+    "acc": "accuracy",
+    "准确率": "accuracy",
+    "召回率": "recall",
+    "精确率": "precision",
+    "f1分数": "f1",
+    "f1 分数": "f1",
+    "均方根误差": "rmse",
+    "平均绝对误差": "mae",
+}
+
+
+def normalize_fact_value(category: FactCategory, value: str) -> str:
+    """归一化事实值,用于同类别去重。
+
+    例如 f1_score / f1 / F1 分数 均归并为 f1,同一材料只保留一条;
+    baseline.fit / baseline.predict 等同一基线的多次出现只留首条。
+    """
+    v = value.strip().lower()
+    v = re.sub(r"[_-]score$", "", v)  # f1_score -> f1, accuracy_score -> accuracy
+    if category == FactCategory.METRIC:
+        v = _METRIC_SYNONYMS.get(v, v)
+    elif category == FactCategory.BASELINE:
+        # 代码中 baseline.fit/predict/赋值/baseline acc= 等视为同一基线线索,只留首条
+        parts = v.split()
+        v = (parts[0] if parts else v).split("=")[0].split(".")[0].strip()
+    return v
+
 
 def span_from_match(doc: ParsedDocument, m: re.Match) -> SourceSpan:
     """把正则匹配扩展为带上下文的原文锚点。

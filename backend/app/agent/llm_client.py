@@ -40,6 +40,7 @@ class LlmClient:
         user_prompt: str,
         temperature: float = 0.2,
         max_tokens: int = 2000,
+        timeout: int = 20,
     ) -> str | None:
         """调用模型,返回原始文本。失败返回 None(调用方自行降级)。"""
         if not self.is_available():
@@ -70,7 +71,7 @@ class LlmClient:
                 },
                 method="POST",
             )
-            with urllib.request.urlopen(req, timeout=20) as resp:
+            with urllib.request.urlopen(req, timeout=timeout) as resp:
                 data = json.loads(resp.read().decode("utf-8"))
                 return data["choices"][0]["message"]["content"]
         except Exception as exc:  # noqa: BLE001

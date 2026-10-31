@@ -6,23 +6,29 @@ import { LoadingDots } from './LoadingDots'
 
 interface Props {
   sessionId: string
+  /** 复核结果变化时通知父组件(用于导出报告等) */
+  onFindingsChange?: (findings: DeepFinding[]) => void
 }
 
 /**
- * 模型复核面板:处理规则无法覆盖的复杂上下文。
+ * 模型复核面板:对规则发现的问题给出详细修复方案,并发现规则无法覆盖的复杂上下文。
  * 仅在接入模型时可用;所有引用已逐字校验,未通过校验的发现不会展示。
  */
-export function DeepReviewPanel({ sessionId }: Props) {
+export function DeepReviewPanel({ sessionId, onFindingsChange }: Props) {
   const [findings, setFindings] = useState<DeepFinding[]>([])
   const [busy, setBusy] = useState(false)
   const [loaded, setLoaded] = useState(false)
+  const [llmAvailable, setLlmAvailable] = useState(true)
 
   async function run() {
     setBusy(true)
     try {
       const res = await deepReview(sessionId)
-      setFindings(res.deep_findings ?? [])
+      const list = res.deep_findings ?? []
+      setFindings(list)
       setLoaded(true)
+      setLlmAvailable(res.llm_available ?? true)
+      onFindingsChange?.(list)
     } finally {
       setBusy(false)
     }
@@ -31,7 +37,7 @@ export function DeepReviewPanel({ sessionId }: Props) {
   return (
     <div className="deep-review-panel">
       <div className="agent-section-header">
-        <span>模型复核(复杂上下文)</span>
+        <span>模型复核(详细修改建议)</span>
         <button disabled={busy} onClick={run}>
           {busy ? '复核中…' : loaded ? '重新复核' : '运行模型复核'}
         </button>
@@ -39,7 +45,9 @@ export function DeepReviewPanel({ sessionId }: Props) {
       {busy && <LoadingDots text="模型正在复核复杂上下文" />}
       {loaded && !busy && findings.length === 0 && (
         <div className="muted">
-          模型未发现规则之外的问题(或未接入模型,此功能需要配置 LLM)。
+          {llmAvailable
+            ? '模型未发现需要补充的问题。'
+            : '未接入模型,此功能需要配置 LLM 密钥。'}
         </div>
       )}
       {findings.map((f, i) => (
@@ -81,8 +89,49 @@ export function DeepReviewPanel({ sessionId }: Props) {
           )}
           {f.suggestion && (
             <div className="finding-section">
-              <div className="section-label">建议</div>
-              <div className="finding-suggestion">{f.suggestion}</div>
+              <div className="section-label">
+                修改建议
+                <span
+                  className={`suggestion-type-badge st-${f.suggestion_type}`}
+                  title={
+                    f.suggestion_type === 'fix'
+                      ? '实验做法或代码有缺陷,需要修改'
+                      : f.suggestion_type === 'narrow'
+                        ? '主张范围过大,需要收窄'
+                        : '信息不明确,需要补充澄清'
+                  }
+                >
+                  {f.suggestion_type === 'fix'
+                    ? '修复实验'
+                    : f.suggestion_type === 'narrow'
+                      ? '收窄主张'
+                      : '补充澄清'}
+                </span>
+              </div>
+              <div className="finding-suggestion">
+                {f.suggestion_action ? (
+                  <>
+                    <div className="suggestion-line">
+                      <span className="suggestion-part">具体怎么改</span>
+                      {f.suggestion_action}
+                    </div>
+                    {f.suggestion_reason && (
+                      <div className="suggestion-line">
+                        <span className="suggestion-part">为什么</span>
+                        {f.suggestion_reason}
+                      </div>
+                    )}
+                    {f.suggestion_verify && (
+                      <div className="suggestion-line">
+                        <span className="suggestion-part">如何验证</span>
+                        {f.suggestion_verify}
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  f.suggestion
+                )}
+              </div>
             </div>
           )}
         </div>

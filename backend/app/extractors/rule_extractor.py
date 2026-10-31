@@ -18,7 +18,7 @@ import re
 from collections.abc import Iterable
 
 from app.models.evidence import ExtractedFact, FactCategory, ParsedDocument
-from app.extractors.base import ExtractorBase, span_from_match
+from app.extractors.base import ExtractorBase, normalize_fact_value, span_from_match
 
 
 def _iter_matches(pattern: str, text: str, flags: int = 0):
@@ -117,12 +117,18 @@ class RuleExtractor(ExtractorBase):
         category: FactCategory,
         patterns: list[tuple[str, str]],
     ) -> Iterable[ExtractedFact]:
+        seen: set[str] = set()  # 同类别归一化值去重(如 f1_score 与 f1 只留一条)
         for pattern, note in patterns:
             for m in _iter_matches(pattern, doc.content, re.IGNORECASE):
+                value = m.group(0).strip()
+                norm = normalize_fact_value(category, value)
+                if norm in seen:
+                    continue
+                seen.add(norm)
                 yield self.make_fact(
                     session_id=session_id,
                     category=category,
-                    value=m.group(0).strip(),
+                    value=value,
                     source=span_from_match(doc, m),
                     note=note,
                 )

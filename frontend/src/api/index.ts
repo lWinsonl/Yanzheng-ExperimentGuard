@@ -163,7 +163,7 @@ export function generateFollowups(
 
 export function deepReview(
   sessionId: string,
-): Promise<{ deep_findings: DeepFinding[] }> {
+): Promise<{ deep_findings: DeepFinding[]; llm_available?: boolean }> {
   return request(`/sessions/${sessionId}/agent/deep-review`, { method: 'POST' })
 }
 

@@ -1,0 +1,25 @@
+# 免费演示实例:不创建付费数据库或持久化磁盘,不启用模型调用。
+services:
+  - type: web
+    name: yanzheng-experiment-guard-demo
+    runtime: docker
+    plan: free
+    region: singapore
+    branch: main
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    healthCheckPath: /api/health
+    autoDeployTrigger: off
+    envVars:
+      - key: PORT
+        value: "10000"
+      - key: DATA_DIR
+        value: /tmp/yanzheng-data
+      - key: STATIC_DIR
+        value: /app/static
+      - key: LLM_API_KEY
+        value: ""
+      - key: LLM_BASE_URL
+        value: ""
+      - key: LLM_MODEL
+        value: ""

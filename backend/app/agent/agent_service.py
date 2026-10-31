@@ -71,6 +71,10 @@ class DeepFinding:
     suggestion: str = ""
     suggestion_type: str = "clarify"
     quote_verified: bool = False
+    # 详细建议三部分(结构化,前端分行展示)
+    suggestion_action: str = ""   # 具体怎么改
+    suggestion_reason: str = ""   # 为什么这样改
+    suggestion_verify: str = ""   # 如何验证
 
 
 @dataclass
@@ -305,6 +309,7 @@ class AgentService:
                 existing_findings=existing or "(无)",
             ),
             max_tokens=3000,
+            timeout=45,
         )
         data = llm_client.parse_json_response(raw)
         if not isinstance(data, dict) or not isinstance(data.get("deep_findings"), list):
@@ -314,20 +319,41 @@ class AgentService:
         for item in data["deep_findings"]:
             if not isinstance(item, dict):
                 continue
+            action = item.get("suggestion_action", "")
+            reason = item.get("suggestion_reason", "")
+            verify = item.get("suggestion_verify", "")
+            raw_suggestion = item.get("suggestion", "")
+            # 兼容:模型未输出结构化字段时,用一句话建议补位
+            if not action and raw_suggestion:
+                action = raw_suggestion
+            # 拼接结构化建议为多行文本(兼容旧字段/导出)
+            parts = []
+            if action:
+                parts.append(f"具体怎么改:{action}")
+            if reason:
+                parts.append(f"为什么:{reason}")
+            if verify:
+                parts.append(f"如何验证:{verify}")
+            suggestion = "\n".join(parts) or raw_suggestion
             finding = DeepFinding(
                 level=item.get("level", "insufficient"),
                 title=item.get("title", ""),
                 reasoning=item.get("reasoning", ""),
                 verified_quote=item.get("quote", ""),
                 material_filename=item.get("material_filename", ""),
-                suggestion=item.get("suggestion", ""),
+                suggestion=suggestion,
                 suggestion_type=item.get("suggestion_type", "clarify"),
+                suggestion_action=action,
+                suggestion_reason=reason,
+                suggestion_verify=verify,
             )
             # 引用校验:quote 必须在某份材料中逐字找到
             finding.quote_verified = self._verify_quote(store, finding.verified_quote)
             if finding.verified_quote and not finding.quote_verified:
-                logger.warning("模型复核引用校验失败(幻觉),丢弃:%s", finding.title)
-                continue
+                # 引用未通过逐字校验(模型轻微改写):不展示该引用,但保留发现与建议
+                logger.warning("模型复核引用校验失败(清除引用,保留发现):%s", finding.title)
+                finding.verified_quote = ""
+                finding.material_filename = ""
             results.append(finding)
         return results
 

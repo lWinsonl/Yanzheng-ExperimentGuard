@@ -1,4 +1,4 @@
-# 免费演示实例:不创建付费数据库或持久化磁盘,不启用模型调用。
+# 免费托管实例。模型配置由 Render 后台管理,不把本地密钥写入仓库。
 services:
   - type: web
     name: yanzheng-experiment-guard-demo
@@ -18,8 +18,8 @@ services:
       - key: STATIC_DIR
         value: /app/static
       - key: LLM_API_KEY
-        value: ""
+        sync: false
       - key: LLM_BASE_URL
-        value: ""
+        sync: false
       - key: LLM_MODEL
-        value: ""
+        sync: false

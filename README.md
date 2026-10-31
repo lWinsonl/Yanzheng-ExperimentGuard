@@ -120,7 +120,7 @@ flowchart LR
 
 [部署到 Render](https://render.com/deploy?repo=https%3A%2F%2Fgithub.com%2FlWinsonl%2FYanzheng-ExperimentGuard) · [查看部署说明](docs/deployment.md)
 
-已提供 React + FastAPI 的单容器部署配置，固定选择免费实例。账号中完成部署后，队友可以通过云端 HTTPS 地址体验；免费实例会休眠，会话使用临时存储。默认不启用模型 API 调用。部署入口不是已经上线的演示地址，实际地址以平台部署结果为准。
+已提供 React + FastAPI 的单容器部署配置，固定选择免费实例。账号中完成部署后，队友可以通过云端 HTTPS 地址体验；免费实例会休眠，会话使用临时存储。本地 `.env` 不会自动迁移，模型配置需在 Render 环境变量中另行设置；未配置时使用规则模式。部署入口不是已经上线的演示地址，实际地址以平台部署结果为准。
 
 ## 本地启动
 

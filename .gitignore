@@ -25,3 +25,6 @@ data/
 
 # 日志
 *.log
+
+# Local evaluation runs may contain private materials; publish only reviewed synthetic reports.
+evaluation/runs/

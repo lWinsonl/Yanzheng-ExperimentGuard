@@ -1,0 +1,106 @@
+FFFFF                                                                    [100%]
+================================== FAILURES ===================================
+__ test_same_unresolved_issue_is_not_resolved_when_evidence_category_changes __
+
+client = <starlette.testclient.TestClient object at 0x000001DAC0C16660>
+
+    @pytest.mark.xfail(strict=True, raises=AssertionError, reason="EG-001 证据类别变化导致同一规则的旧问题被误标为已解决")
+    def test_same_unresolved_issue_is_not_resolved_when_evidence_category_changes(client):
+        sid = make_session(client, "模型A优于基线B")
+        first = review_service.run_review(sid)
+        old = next(f for f in first.findings if f.rule_id == "dm_baseline")
+        upload_text(client, sid, "计划设置基线B", "plan.md", "plan")
+        confirm(client, sid)
+        result = version_diff_service.run_version_diff(sid, "补充了基线计划，尚未运行")
+        assert any(f.rule_id == "dm_baseline" for f in data_store.require(sid).latest_report().findings)
+        paired = next(c for c in result.comparisons if c.old_finding_id == old.finding_id)
+>       assert paired.status != VersionDiffStatus.RESOLVED
+E       AssertionError: assert <VersionDiffStatus.RESOLVED: 'resolved'> != <VersionDiffStatus.RESOLVED: 'resolved'>
+E        +  where <VersionDiffStatus.RESOLVED: 'resolved'> = VersionDiffComparison(comparison_id='vdiff_7a0b741a47', old_finding_id='find_451a8ac94c', identity=FindingIdentity(ide...fStatus.RESOLVED: 'resolved'>, reason='修改后提供了新的证据,该问题不再触发。', old_level='insufficient', new_level='', new_finding_id='').status
+E        +  and   <VersionDiffStatus.RESOLVED: 'resolved'> = VersionDiffStatus.RESOLVED
+
+system_tests\test_known_defects.py:27: AssertionError
+___________ test_unchanged_metric_does_not_validate_revision_claim ____________
+
+client = <starlette.testclient.TestClient object at 0x000001DAC0BD1590>
+
+    @pytest.mark.xfail(strict=True, raises=AssertionError, reason="EG-002 用旧发现引用代替完整旧事实快照，使未修改的指标被报告为新增且理由一致")
+    def test_unchanged_metric_does_not_validate_revision_claim(client):
+        sid = make_session(client, "描述本次实验结果")
+        upload_text(client, sid, "F1=0.8", "result.log")
+        confirm(client, sid)
+        first = review_service.run_review(sid)
+        alignment = version_diff_service._align_revision("我已修改评价指标", first, data_store.require(sid))
+>       assert alignment.alignment != RevisionAlignmentLevel.ALIGNED
+E       AssertionError: assert <RevisionAlignmentLevel.ALIGNED: 'aligned'> != <RevisionAlignmentLevel.ALIGNED: 'aligned'>
+E        +  where <RevisionAlignmentLevel.ALIGNED: 'aligned'> = RevisionAlignment(revision_note='我已修改评价指标', claimed_changes=['声称修改了metric(关键词:指标)'], actual_changes=[FactChange(catego...='added')], alignment=<RevisionAlignmentLevel.ALIGNED: 'aligned'>, alignment_detail='声称改动(metric)与事实层面实际变化(metric)一致。').alignment
+E        +  and   <RevisionAlignmentLevel.ALIGNED: 'aligned'> = RevisionAlignmentLevel.ALIGNED
+
+system_tests\test_known_defects.py:37: AssertionError
+___________ test_unsupported_docx_is_explicitly_rejected_or_flagged ___________
+
+client = <starlette.testclient.TestClient object at 0x000001DAC0BD2E90>
+
+    @pytest.mark.xfail(strict=True, raises=AssertionError, reason="EG-003 未实现DOCX解析却以普通文本成功接收，未报告解析缺口")
+    def test_unsupported_docx_is_explicitly_rejected_or_flagged(client):
+        sid = make_session(client)
+        stream = io.BytesIO()
+        with zipfile.ZipFile(stream, "w") as archive:
+            archive.writestr("word/document.xml", "<document>实验计划F1</document>")
+        response = client.post(f"/api/sessions/{sid}/materials/upload", data={"role": "plan"},
+                               files={"file": ("plan.docx", stream.getvalue())})
+>       assert response.status_code in (400, 415, 422) or response.json().get("ocr_required") or response.json().get("dropped")
+E       AssertionError: assert (200 in (400, 415, 422) or False or [])
+E        +  where 200 = <Response [200 OK]>.status_code
+E        +  and   False = <built-in method get of dict object at 0x000001DAC0BC6440>('ocr_required')
+E        +    where <built-in method get of dict object at 0x000001DAC0BC6440> = {'material_id': 'mat_60cae94362', 'filename': 'plan.docx', 'role': 'plan', 'kind': 'text', ...}.get
+E        +      where {'material_id': 'mat_60cae94362', 'filename': 'plan.docx', 'role': 'plan', 'kind': 'text', ...} = json()
+E        +        where json = <Response [200 OK]>.json
+E        +  and   [] = <built-in method get of dict object at 0x000001DAC0ADD680>('dropped')
+E        +    where <built-in method get of dict object at 0x000001DAC0ADD680> = {'material_id': 'mat_60cae94362', 'filename': 'plan.docx', 'role': 'plan', 'kind': 'text', ...}.get
+E        +      where {'material_id': 'mat_60cae94362', 'filename': 'plan.docx', 'role': 'plan', 'kind': 'text', ...} = json()
+E        +        where json = <Response [200 OK]>.json
+
+system_tests\test_known_defects.py:48: AssertionError
+___________ test_invalid_material_role_is_not_silently_reclassified ___________
+
+client = <starlette.testclient.TestClient object at 0x000001DAC0BFBE10>
+
+    @pytest.mark.xfail(strict=True, raises=AssertionError, reason="EG-004 非法材料角色被静默改成plan，缺少输入枚举校验")
+    def test_invalid_material_role_is_not_silently_reclassified(client):
+        sid = make_session(client)
+        response = client.post(f"/api/sessions/{sid}/materials/text", json={
+            "role": "results", "filename": "result.log", "content": "F1=0.8"})
+>       assert response.status_code in (400, 422)
+E       assert 200 in (400, 422)
+E        +  where 200 = <Response [200 OK]>.status_code
+
+system_tests\test_known_defects.py:56: AssertionError
+__________ test_example_numbers_in_code_do_not_replace_observed_runs __________
+
+client = <starlette.testclient.TestClient object at 0x000001DAC0BFBCE0>
+
+    @pytest.mark.xfail(strict=True, raises=AssertionError, reason="EG-005 代码注释中的示例均值标准差被当作实际重复运行结果")
+    def test_example_numbers_in_code_do_not_replace_observed_runs(client):
+        sid = make_session(client, "模型A比基线B更稳定")
+        upload_text(client, sid, "# 这里只是未来日志格式示例，并未运行实验\n# F1=0.87 ± 0.02\nseed=42", "example.py")
+        confirm(client, sid)
+        report = review_service.run_review(sid)
+>       assert any(f.rule_id == "dm_repetition" for f in report.findings)
+E       assert False
+E        +  where False = any(<generator object test_example_numbers_in_code_do_not_replace_observed_runs.<locals>.<genexpr> at 0x000001DAC0B4F9F0>)
+
+system_tests\test_known_defects.py:65: AssertionError
+============================== warnings summary ===============================
+C:\Users\winso\AppData\Roaming\Python\Python313\site-packages\starlette\testclient.py:40
+  C:\Users\winso\AppData\Roaming\Python\Python313\site-packages\starlette\testclient.py:40: DeprecationWarning: The anyio.abc.BlockingPortal alias is deprecated, use anyio.from_thread.BlockingPortal instead.
+    _PortalFactoryType = typing.Callable[[], typing.ContextManager[anyio.abc.BlockingPortal]]
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ===========================
+FAILED system_tests/test_known_defects.py::test_same_unresolved_issue_is_not_resolved_when_evidence_category_changes
+FAILED system_tests/test_known_defects.py::test_unchanged_metric_does_not_validate_revision_claim
+FAILED system_tests/test_known_defects.py::test_unsupported_docx_is_explicitly_rejected_or_flagged
+FAILED system_tests/test_known_defects.py::test_invalid_material_role_is_not_silently_reclassified
+FAILED system_tests/test_known_defects.py::test_example_numbers_in_code_do_not_replace_observed_runs
+5 failed, 1 warning in 0.37s

@@ -1,0 +1,1 @@
+case_id,project_id,rater_id,round,target_aspect,relation_label,required_premises,missing_premises,evidence_filename,evidence_start_char,evidence_end_char,evidence_quote,scope_limit,reason,confidence_note,adjudicator_id,adjudicated_label

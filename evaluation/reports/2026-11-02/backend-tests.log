@@ -1,0 +1,15 @@
+........................................................................ [ 57%]
+................................................xxxxx                    [100%]
+============================== warnings summary ===============================
+C:\Users\winso\AppData\Roaming\Python\Python313\site-packages\starlette\testclient.py:40
+  C:\Users\winso\AppData\Roaming\Python\Python313\site-packages\starlette\testclient.py:40: DeprecationWarning: The anyio.abc.BlockingPortal alias is deprecated, use anyio.from_thread.BlockingPortal instead.
+    _PortalFactoryType = typing.Callable[[], typing.ContextManager[anyio.abc.BlockingPortal]]
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ===========================
+XFAIL system_tests/test_known_defects.py::test_same_unresolved_issue_is_not_resolved_when_evidence_category_changes - EG-001 证据类别变化导致同一规则的旧问题被误标为已解决
+XFAIL system_tests/test_known_defects.py::test_unchanged_metric_does_not_validate_revision_claim - EG-002 用旧发现引用代替完整旧事实快照，使未修改的指标被报告为新增且理由一致
+XFAIL system_tests/test_known_defects.py::test_unsupported_docx_is_explicitly_rejected_or_flagged - EG-003 未实现DOCX解析却以普通文本成功接收，未报告解析缺口
+XFAIL system_tests/test_known_defects.py::test_invalid_material_role_is_not_silently_reclassified - EG-004 非法材料角色被静默改成plan，缺少输入枚举校验
+XFAIL system_tests/test_known_defects.py::test_example_numbers_in_code_do_not_replace_observed_runs - EG-005 代码注释中的示例均值标准差被当作实际重复运行结果
+120 passed, 5 xfailed, 1 warning in 2.02s

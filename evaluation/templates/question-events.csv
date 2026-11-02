@@ -1,0 +1,1 @@
+case_id,project_id,blind_condition,run_id,turn,question_id,rank,eiv_score,severity_estimate,uncertainty_estimate,change_estimate,cost_estimate,question_text,answer_card_id,answer_available,answer_seconds,model_calls,input_tokens,output_tokens,judgment_before,judgment_after,teacher_verified_useful,teacher_verified_change,change_reason,quota_exhausted

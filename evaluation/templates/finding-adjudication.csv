@@ -1,0 +1,1 @@
+case_id,project_id,blind_output_id,run_id,gold_issue_id,output_finding_id,claim_id,issue_category,evidence_scope,match_label_TP_FP_FN,duplicate_finding,citation_present,anchor_valid,inference_supported,suggestion_score_0_2,revision_gold_status,revision_output_status,rater_id,reason

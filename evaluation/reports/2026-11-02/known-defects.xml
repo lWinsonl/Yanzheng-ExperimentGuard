@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="utf-8"?><testsuites name="pytest tests"><testsuite name="pytest" errors="0" failures="5" skipped="0" tests="5" time="0.290" timestamp="2026-11-02T18:15:27.379834+08:00" hostname="WEIZHANG"><testcase classname="system_tests.test_known_defects" name="test_same_unresolved_issue_is_not_resolved_when_evidence_category_changes" time="0.036"><failure message="AssertionError: assert &lt;VersionDiffStatus.RESOLVED: 'resolved'&gt; != &lt;VersionDiffStatus.RESOLVED: 'resolved'&gt;&#10; +  where &lt;VersionDiffStatus.RESOLVED: 'resolved'&gt; = VersionDiffComparison(comparison_id='vdiff_7a0b741a47', old_finding_id='find_451a8ac94c', identity=FindingIdentity(ide...fStatus.RESOLVED: 'resolved'&gt;, reason='修改后提供了新的证据,该问题不再触发。', old_level='insufficient', new_level='', new_finding_id='').status&#10; +  and   &lt;VersionDiffStatus.RESOLVED: 'resolved'&gt; = VersionDiffStatus.RESOLVED">client = &lt;starlette.testclient.TestClient object at 0x000001DAC0C16660&gt;
+
+    @pytest.mark.xfail(strict=True, raises=AssertionError, reason="EG-001 证据类别变化导致同一规则的旧问题被误标为已解决")
+    def test_same_unresolved_issue_is_not_resolved_when_evidence_category_changes(client):
+        sid = make_session(client, "模型A优于基线B")
+        first = review_service.run_review(sid)
+        old = next(f for f in first.findings if f.rule_id == "dm_baseline")
+        upload_text(client, sid, "计划设置基线B", "plan.md", "plan")
+        confirm(client, sid)
+        result = version_diff_service.run_version_diff(sid, "补充了基线计划，尚未运行")
+        assert any(f.rule_id == "dm_baseline" for f in data_store.require(sid).latest_report().findings)
+        paired = next(c for c in result.comparisons if c.old_finding_id == old.finding_id)
+&gt;       assert paired.status != VersionDiffStatus.RESOLVED
+E       AssertionError: assert &lt;VersionDiffStatus.RESOLVED: 'resolved'&gt; != &lt;VersionDiffStatus.RESOLVED: 'resolved'&gt;
+E        +  where &lt;VersionDiffStatus.RESOLVED: 'resolved'&gt; = VersionDiffComparison(comparison_id='vdiff_7a0b741a47', old_finding_id='find_451a8ac94c', identity=FindingIdentity(ide...fStatus.RESOLVED: 'resolved'&gt;, reason='修改后提供了新的证据,该问题不再触发。', old_level='insufficient', new_level='', new_finding_id='').status
+E        +  and   &lt;VersionDiffStatus.RESOLVED: 'resolved'&gt; = VersionDiffStatus.RESOLVED
+
+system_tests\test_known_defects.py:27: AssertionError</failure></testcase><testcase classname="system_tests.test_known_defects" name="test_unchanged_metric_does_not_validate_revision_claim" time="0.015"><failure message="AssertionError: assert &lt;RevisionAlignmentLevel.ALIGNED: 'aligned'&gt; != &lt;RevisionAlignmentLevel.ALIGNED: 'aligned'&gt;&#10; +  where &lt;RevisionAlignmentLevel.ALIGNED: 'aligned'&gt; = RevisionAlignment(revision_note='我已修改评价指标', claimed_changes=['声称修改了metric(关键词:指标)'], actual_changes=[FactChange(catego...='added')], alignment=&lt;RevisionAlignmentLevel.ALIGNED: 'aligned'&gt;, alignment_detail='声称改动(metric)与事实层面实际变化(metric)一致。').alignment&#10;[+1 more line; full report in element text]">client = &lt;starlette.testclient.TestClient object at 0x000001DAC0BD1590&gt;
+
+    @pytest.mark.xfail(strict=True, raises=AssertionError, reason="EG-002 用旧发现引用代替完整旧事实快照，使未修改的指标被报告为新增且理由一致")
+    def test_unchanged_metric_does_not_validate_revision_claim(client):
+        sid = make_session(client, "描述本次实验结果")
+        upload_text(client, sid, "F1=0.8", "result.log")
+        confirm(client, sid)
+        first = review_service.run_review(sid)
+        alignment = version_diff_service._align_revision("我已修改评价指标", first, data_store.require(sid))
+&gt;       assert alignment.alignment != RevisionAlignmentLevel.ALIGNED
+E       AssertionError: assert &lt;RevisionAlignmentLevel.ALIGNED: 'aligned'&gt; != &lt;RevisionAlignmentLevel.ALIGNED: 'aligned'&gt;
+E        +  where &lt;RevisionAlignmentLevel.ALIGNED: 'aligned'&gt; = RevisionAlignment(revision_note='我已修改评价指标', claimed_changes=['声称修改了metric(关键词:指标)'], actual_changes=[FactChange(catego...='added')], alignment=&lt;RevisionAlignmentLevel.ALIGNED: 'aligned'&gt;, alignment_detail='声称改动(metric)与事实层面实际变化(metric)一致。').alignment
+E        +  and   &lt;RevisionAlignmentLevel.ALIGNED: 'aligned'&gt; = RevisionAlignmentLevel.ALIGNED
+
+system_tests\test_known_defects.py:37: AssertionError</failure></testcase><testcase classname="system_tests.test_known_defects" name="test_unsupported_docx_is_explicitly_rejected_or_flagged" time="0.072"><failure message="AssertionError: assert (200 in (400, 415, 422) or False or [])&#10; +  where 200 = &lt;Response [200 OK]&gt;.status_code&#10; +  and   False = &lt;built-in method get of dict object at 0x000001DAC0BC6440&gt;('ocr_required')&#10; +    where &lt;built-in method get of dict object at 0x000001DAC0BC6440&gt; = {'material_id': 'mat_60cae94362', 'filename': 'plan.docx', 'role': 'plan', 'kind': 'text', ...}.get&#10; +      where {'material_id': 'mat_60cae94362', 'filename': 'plan.docx', 'role': 'plan', 'kind': 'text', ...} = json()&#10;[+5 more lines; full report in element text]">client = &lt;starlette.testclient.TestClient object at 0x000001DAC0BD2E90&gt;
+
+    @pytest.mark.xfail(strict=True, raises=AssertionError, reason="EG-003 未实现DOCX解析却以普通文本成功接收，未报告解析缺口")
+    def test_unsupported_docx_is_explicitly_rejected_or_flagged(client):
+        sid = make_session(client)
+        stream = io.BytesIO()
+        with zipfile.ZipFile(stream, "w") as archive:
+            archive.writestr("word/document.xml", "&lt;document&gt;实验计划F1&lt;/document&gt;")
+        response = client.post(f"/api/sessions/{sid}/materials/upload", data={"role": "plan"},
+                               files={"file": ("plan.docx", stream.getvalue())})
+&gt;       assert response.status_code in (400, 415, 422) or response.json().get("ocr_required") or response.json().get("dropped")
+E       AssertionError: assert (200 in (400, 415, 422) or False or [])
+E        +  where 200 = &lt;Response [200 OK]&gt;.status_code
+E        +  and   False = &lt;built-in method get of dict object at 0x000001DAC0BC6440&gt;('ocr_required')
+E        +    where &lt;built-in method get of dict object at 0x000001DAC0BC6440&gt; = {'material_id': 'mat_60cae94362', 'filename': 'plan.docx', 'role': 'plan', 'kind': 'text', ...}.get
+E        +      where {'material_id': 'mat_60cae94362', 'filename': 'plan.docx', 'role': 'plan', 'kind': 'text', ...} = json()
+E        +        where json = &lt;Response [200 OK]&gt;.json
+E        +  and   [] = &lt;built-in method get of dict object at 0x000001DAC0ADD680&gt;('dropped')
+E        +    where &lt;built-in method get of dict object at 0x000001DAC0ADD680&gt; = {'material_id': 'mat_60cae94362', 'filename': 'plan.docx', 'role': 'plan', 'kind': 'text', ...}.get
+E        +      where {'material_id': 'mat_60cae94362', 'filename': 'plan.docx', 'role': 'plan', 'kind': 'text', ...} = json()
+E        +        where json = &lt;Response [200 OK]&gt;.json
+
+system_tests\test_known_defects.py:48: AssertionError</failure></testcase><testcase classname="system_tests.test_known_defects" name="test_invalid_material_role_is_not_silently_reclassified" time="0.010"><failure message="assert 200 in (400, 422)&#10; +  where 200 = &lt;Response [200 OK]&gt;.status_code">client = &lt;starlette.testclient.TestClient object at 0x000001DAC0BFBE10&gt;
+
+    @pytest.mark.xfail(strict=True, raises=AssertionError, reason="EG-004 非法材料角色被静默改成plan，缺少输入枚举校验")
+    def test_invalid_material_role_is_not_silently_reclassified(client):
+        sid = make_session(client)
+        response = client.post(f"/api/sessions/{sid}/materials/text", json={
+            "role": "results", "filename": "result.log", "content": "F1=0.8"})
+&gt;       assert response.status_code in (400, 422)
+E       assert 200 in (400, 422)
+E        +  where 200 = &lt;Response [200 OK]&gt;.status_code
+
+system_tests\test_known_defects.py:56: AssertionError</failure></testcase><testcase classname="system_tests.test_known_defects" name="test_example_numbers_in_code_do_not_replace_observed_runs" time="0.019"><failure message="assert False&#10; +  where False = any(&lt;generator object test_example_numbers_in_code_do_not_replace_observed_runs.&lt;locals&gt;.&lt;genexpr&gt; at 0x000001DAC0B4F9F0&gt;)">client = &lt;starlette.testclient.TestClient object at 0x000001DAC0BFBCE0&gt;
+
+    @pytest.mark.xfail(strict=True, raises=AssertionError, reason="EG-005 代码注释中的示例均值标准差被当作实际重复运行结果")
+    def test_example_numbers_in_code_do_not_replace_observed_runs(client):
+        sid = make_session(client, "模型A比基线B更稳定")
+        upload_text(client, sid, "# 这里只是未来日志格式示例，并未运行实验\n# F1=0.87 ± 0.02\nseed=42", "example.py")
+        confirm(client, sid)
+        report = review_service.run_review(sid)
+&gt;       assert any(f.rule_id == "dm_repetition" for f in report.findings)
+E       assert False
+E        +  where False = any(&lt;generator object test_example_numbers_in_code_do_not_replace_observed_runs.&lt;locals&gt;.&lt;genexpr&gt; at 0x000001DAC0B4F9F0&gt;)
+
+system_tests\test_known_defects.py:65: AssertionError</failure></testcase></testsuite></testsuites>

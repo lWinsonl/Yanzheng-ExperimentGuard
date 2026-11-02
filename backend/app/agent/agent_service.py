@@ -78,6 +78,35 @@ class DeepFinding:
 
 
 @dataclass
+class MaterialCoverage:
+    """单份材料的复核覆盖情况(透明度:告知用户模型实际检查了哪些范围)。"""
+    material_id: str = ""
+    filename: str = ""
+    role: str = ""           # plan / execution
+    total_chars: int = 0     # 材料全文长度
+    checked_chars: int = 0   # 模型实际检查的字符数
+    truncated: bool = False  # 是否有内容未送入模型
+
+
+@dataclass
+class DeepReviewResult:
+    """模型复核结果(含状态与覆盖范围,前端据此区分展示)。
+
+    status 取值:
+        ok               调用成功且有发现
+        ok_no_findings   调用成功且无发现
+        llm_unavailable  未配置大模型密钥
+        llm_call_failed  模型调用失败(超时/网络)
+        llm_parse_failed 模型返回了但解析失败
+    """
+    status: str = "ok"
+    message: str = ""
+    findings: list[DeepFinding] = field(default_factory=list)
+    coverage: list[MaterialCoverage] = field(default_factory=list)
+    llm_available: bool = False
+
+
+@dataclass
 class TeachingCase:
     """教学小案例。"""
     case_title: str = ""
@@ -284,21 +313,30 @@ class AgentService:
 
     # ---- 4. 模型复核(复杂上下文,引用校验) ----
 
-    def deep_review(self, session_id: str) -> list[DeepFinding]:
-        """模型复核:处理规则无法覆盖的复杂上下文。引用必须逐字校验。"""
+    def deep_review(self, session_id: str) -> DeepReviewResult:
+        """模型复核:处理规则无法覆盖的复杂上下文。引用必须逐字校验。
+
+        返回 DeepReviewResult,通过 status 区分:
+        调用成功(有/无发现)、未接入模型、调用失败、解析失败。
+        coverage 记录每份材料的实际检查范围(长文档截断时明示)。
+        """
         store = data_store.require(session_id)
         session = store.session
 
         if not llm_client.is_available():
-            return []
+            return DeepReviewResult(
+                status="llm_unavailable",
+                message="未配置大模型密钥,模型复核不可用。配置 LLM_API_KEY 后可获得深入分析。",
+                llm_available=False,
+            )
 
         report = store.latest_report()
         existing = ""
         if report:
             existing = "\n".join(f"- [{f.level.value}] {f.title}" for f in report.findings)
 
-        # 拼接材料内容(限制总长度防超 token)
-        materials_text = self._materials_text(store, max_chars=8000)
+        # 拼接材料内容(限制总长度防超 token),同时记录覆盖范围
+        materials_text, coverage = self._materials_text(store, max_chars=8000)
         claims_text = "\n".join(f"- {c.text}" for c in session.claims)
 
         raw = llm_client.chat(
@@ -310,13 +348,43 @@ class AgentService:
             ),
             max_tokens=3000,
             timeout=45,
+            retries=1,
         )
+        if raw is None:
+            return DeepReviewResult(
+                status="llm_call_failed",
+                message="模型调用失败(超时或网络异常),请稍后重试。",
+                coverage=coverage,
+                llm_available=True,
+            )
+
         data = llm_client.parse_json_response(raw)
         if not isinstance(data, dict) or not isinstance(data.get("deep_findings"), list):
-            return []
+            logger.warning(
+                "模型复核输出解析失败,原始输出前200字符:%s", (raw or "")[:200]
+            )
+            return DeepReviewResult(
+                status="llm_parse_failed",
+                message="模型返回内容无法解析为结构化结果,请重试。",
+                coverage=coverage,
+                llm_available=True,
+            )
 
+        findings = self._parse_deep_findings(store, data["deep_findings"])
+        return DeepReviewResult(
+            status="ok" if findings else "ok_no_findings",
+            message="" if findings else "模型已完成复核,未发现需要补充的问题。",
+            findings=findings,
+            coverage=coverage,
+            llm_available=True,
+        )
+
+    def _parse_deep_findings(
+        self, store: SessionStore, items: list
+    ) -> list[DeepFinding]:
+        """解析模型复核输出列表:结构化建议兼容、引用逐字校验。"""
         results: list[DeepFinding] = []
-        for item in data["deep_findings"]:
+        for item in items:
             if not isinstance(item, dict):
                 continue
             action = item.get("suggestion_action", "")
@@ -484,17 +552,53 @@ class AgentService:
         return "\n".join(lines)
 
     @staticmethod
-    def _materials_text(store: SessionStore, max_chars: int = 8000) -> str:
-        parts = []
+    def _materials_text(
+        store: SessionStore, max_chars: int = 8000, per_doc_limit: int = 2000
+    ) -> tuple[str, list[MaterialCoverage]]:
+        """拼接材料内容供模型复核,同时记录每份材料的实际检查范围。
+
+        限制:单份材料最多 per_doc_limit 字符,总量最多 max_chars 字符。
+        超出部分不送入模型,但在 coverage 中标记 truncated=True,
+        前端明确告知用户哪些内容未检查,避免误以为已全量复核。
+        """
+        parts: list[str] = []
+        coverage: list[MaterialCoverage] = []
         total = 0
         for d in store.docs.values():
-            content = d.content[:2000]
-            total += len(content)
-            if total > max_chars:
-                break
-            role = "计划" if d.role == MaterialRole.PLAN else "执行"
-            parts.append(f"=== [{role}] {d.filename} ===\n{content}")
-        return "\n\n".join(parts) or "(无材料)"
+            role = "plan" if d.role == MaterialRole.PLAN else "execution"
+            total_chars = len(d.content)
+            doc_take = min(total_chars, per_doc_limit)
+            if doc_take > 0 and total + doc_take <= max_chars:
+                content = d.content[:per_doc_limit]
+                total += len(content)
+                header = f"=== [{role}] {d.filename} ==="
+                # 截断标注:告知模型该材料不完整,避免对未见内容误判"未发现问题"
+                tail = (
+                    f"\n[注意:该材料共 {total_chars} 字符,此处仅提供前 {per_doc_limit} 字符,"
+                    f"后续内容未提供。若问题可能在未提供部分,请在 reasoning 中说明无法完整判断。]"
+                    if total_chars > per_doc_limit
+                    else ""
+                )
+                parts.append(f"{header}\n{content}{tail}")
+                coverage.append(MaterialCoverage(
+                    material_id=d.material_id,
+                    filename=d.filename,
+                    role=role,
+                    total_chars=total_chars,
+                    checked_chars=len(content),
+                    truncated=total_chars > per_doc_limit,
+                ))
+            else:
+                # 超出总量限制,该材料完全未送入模型
+                coverage.append(MaterialCoverage(
+                    material_id=d.material_id,
+                    filename=d.filename,
+                    role=role,
+                    total_chars=total_chars,
+                    checked_chars=0,
+                    truncated=total_chars > 0,
+                ))
+        return "\n\n".join(parts) or "(无材料)", coverage
 
 
 agent_service = AgentService()

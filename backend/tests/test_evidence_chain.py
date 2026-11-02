@@ -137,9 +137,42 @@ def test_ocr_material_flags_insufficient():
     assert isinstance(facts, list)
 
 
+def test_clear_materials_replace_mode():
+    """替换模式:清除指定角色材料后,旧材料与关联事实一并消失,另一角色不受影响。"""
+    session = _new_session()
+    sid = session.session_id
+
+    # 各上传一份计划和执行材料
+    evidence_chain.extract_from_text(
+        sid, "实验计划:数据按设备划分,指标为 F1。", "plan_v1.md", "plan"
+    )
+    evidence_chain.extract_from_text(
+        sid, "训练代码:lr=0.001,跑了一次。", "train_v1.py", "execution"
+    )
+    store = data_store.require(sid)
+    assert len(store.docs) == 2, "应有两份材料"
+    facts_before = len(store.facts)
+    assert facts_before > 0, "应已提取事实"
+
+    # 替换计划材料:清除 plan 角色
+    removed = evidence_chain.clear_materials(sid, "plan")
+    assert removed == 1, "应清除 1 份计划材料"
+
+    store = data_store.require(sid)
+    remaining_roles = {d.role.value for d in store.docs.values()}
+    assert "plan" not in remaining_roles, "计划材料应已全部清除"
+    assert "execution" in remaining_roles, "执行材料不应受影响"
+    # 关联事实应级联删除:剩余事实都来自执行材料
+    for f in store.facts.values():
+        assert f.source.material_id in store.docs, (
+            f"清除后残留孤儿事实:{f.fact_id}"
+        )
+
+
 if __name__ == "__main__":
     test_extract_facts_with_verified_spans()
     test_hallucinated_span_is_dropped()
     test_fact_confirm_flow()
     test_ocr_material_flags_insufficient()
+    test_clear_materials_replace_mode()
     print("证据链核心测试全部通过")

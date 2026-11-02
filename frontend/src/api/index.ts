@@ -1,7 +1,7 @@
 // API 客户端:所有请求经 Vite 代理转发到后端
 import type {
   AgentStatus,
-  DeepFinding,
+  DeepReviewResult,
   DirectionAnalysis,
   ExperimentType,
   ExtractedFact,
@@ -67,9 +67,11 @@ export async function uploadFile(
   sessionId: string,
   role: MaterialRole,
   file: File,
+  mode: 'append' | 'replace' = 'append',
 ): Promise<IngestResponse> {
   const form = new FormData()
   form.append('role', role)
+  form.append('mode', mode)
   form.append('file', file)
   const res = await fetch(`${BASE}/sessions/${sessionId}/materials/upload`, {
     method: 'POST',
@@ -87,10 +89,11 @@ export function addTextMaterial(
   role: MaterialRole,
   filename: string,
   content: string,
+  mode: 'append' | 'replace' = 'append',
 ): Promise<IngestResponse> {
   return request(`/sessions/${sessionId}/materials/text`, {
     method: 'POST',
-    body: JSON.stringify({ role, filename, content }),
+    body: JSON.stringify({ role, filename, content, mode }),
   })
 }
 
@@ -161,9 +164,7 @@ export function generateFollowups(
   return request(`/sessions/${sessionId}/agent/followups`, { method: 'POST' })
 }
 
-export function deepReview(
-  sessionId: string,
-): Promise<{ deep_findings: DeepFinding[]; llm_available?: boolean }> {
+export function deepReview(sessionId: string): Promise<DeepReviewResult> {
   return request(`/sessions/${sessionId}/agent/deep-review`, { method: 'POST' })
 }
 

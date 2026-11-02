@@ -216,6 +216,33 @@ export interface DeepFinding {
   suggestion_verify?: string
 }
 
+/** 单份材料的复核覆盖情况 */
+export interface MaterialCoverage {
+  material_id: string
+  filename: string
+  role: string
+  total_chars: number
+  checked_chars: number
+  truncated: boolean
+}
+
+/** 模型复核状态:区分调用成功/失败/解析失败 */
+export type DeepReviewStatus =
+  | 'ok'
+  | 'ok_no_findings'
+  | 'llm_unavailable'
+  | 'llm_call_failed'
+  | 'llm_parse_failed'
+
+/** 模型复核完整结果(含状态、发现、覆盖范围) */
+export interface DeepReviewResult {
+  status: DeepReviewStatus
+  message: string
+  findings: DeepFinding[]
+  coverage: MaterialCoverage[]
+  llm_available: boolean
+}
+
 export interface TeachingCase {
   case_title: string
   case_description: string

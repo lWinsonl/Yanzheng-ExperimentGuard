@@ -14,10 +14,13 @@ router = APIRouter(prefix="/api/sessions/{session_id}/materials", tags=["materia
 async def upload_material(
     session_id: str,
     role: str = Form(...),
+    mode: str = Form("append"),
     file: UploadFile = File(...),
 ):
-    """上传文件材料。role 为 plan 或 execution。"""
+    """上传文件材料。role 为 plan 或 execution;mode 为 append(补充)或 replace(替换旧版本)。"""
     try:
+        if mode == "replace":
+            evidence_chain.clear_materials(session_id, role)
         raw = await file.read()
         doc, facts, dropped = evidence_chain.ingest_material(
             session_id, raw, file.filename or "unnamed", role
@@ -40,12 +43,15 @@ class TextMaterialRequest(BaseModel):
     role: str
     filename: str
     content: str
+    mode: str = "append"  # append(补充) / replace(替换旧版本)
 
 
 @router.post("/text")
 def add_text_material(session_id: str, req: TextMaterialRequest):
-    """粘贴文本材料(实验计划、代码片段等)。"""
+    """粘贴文本材料(实验计划、代码片段等)。mode 为 append 或 replace。"""
     try:
+        if req.mode == "replace":
+            evidence_chain.clear_materials(session_id, req.role)
         doc, facts, dropped = evidence_chain.extract_from_text(
             session_id, req.content, req.filename, req.role
         )

@@ -41,42 +41,57 @@ class LlmClient:
         temperature: float = 0.2,
         max_tokens: int = 2000,
         timeout: int = 20,
+        retries: int = 0,
     ) -> str | None:
-        """调用模型,返回原始文本。失败返回 None(调用方自行降级)。"""
+        """调用模型,返回原始文本。失败返回 None(调用方自行降级)。
+
+        retries: 失败后重试次数(0=不重试)。重试间隔 1 秒,
+        用于应对偶发超时/网络抖动——竞赛演示场景建议 deep_review 等长任务设 1-2。
+        """
         if not self.is_available():
             return None
-        try:
-            import urllib.request
+        import time
+        import urllib.request
 
-            url = settings.llm_base_url.rstrip("/") + "/chat/completions"
-            payload = json.dumps(
-                {
-                    "model": settings.llm_model,
-                    "messages": [
-                        {"role": "system", "content": system_prompt},
-                        {"role": "user", "content": user_prompt},
-                    ],
-                    "temperature": temperature,
-                    "max_tokens": max_tokens,
-                },
-                ensure_ascii=False,
-            ).encode("utf-8")
+        url = settings.llm_base_url.rstrip("/") + "/chat/completions"
+        payload = json.dumps(
+            {
+                "model": settings.llm_model,
+                "messages": [
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_prompt},
+                ],
+                "temperature": temperature,
+                "max_tokens": max_tokens,
+            },
+            ensure_ascii=False,
+        ).encode("utf-8")
 
-            req = urllib.request.Request(
-                url,
-                data=payload,
-                headers={
-                    "Content-Type": "application/json",
-                    "Authorization": f"Bearer {settings.llm_api_key}",
-                },
-                method="POST",
-            )
-            with urllib.request.urlopen(req, timeout=timeout) as resp:
-                data = json.loads(resp.read().decode("utf-8"))
-                return data["choices"][0]["message"]["content"]
-        except Exception as exc:  # noqa: BLE001
-            logger.warning("LLM 调用失败,降级到启发式:%s", exc)
-            return None
+        last_exc: Exception | None = None
+        for attempt in range(retries + 1):
+            try:
+                req = urllib.request.Request(
+                    url,
+                    data=payload,
+                    headers={
+                        "Content-Type": "application/json",
+                        "Authorization": f"Bearer {settings.llm_api_key}",
+                    },
+                    method="POST",
+                )
+                with urllib.request.urlopen(req, timeout=timeout) as resp:
+                    data = json.loads(resp.read().decode("utf-8"))
+                    return data["choices"][0]["message"]["content"]
+            except Exception as exc:  # noqa: BLE001
+                last_exc = exc
+                if attempt < retries:
+                    logger.warning(
+                        "LLM 调用失败(第 %d 次),%.0f 秒后重试:%s",
+                        attempt + 1, 1.0, exc,
+                    )
+                    time.sleep(1.0)
+        logger.warning("LLM 调用失败(已重试 %d 次),降级到启发式:%s", retries, last_exc)
+        return None
 
     @staticmethod
     def parse_json_response(raw: str) -> dict | list | None:

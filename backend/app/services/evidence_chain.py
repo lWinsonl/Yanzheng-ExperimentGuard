@@ -152,5 +152,42 @@ class EvidenceChainService:
         """便捷方法:直接从文本摄取(前端粘贴内容时使用)。"""
         return self.ingest_material(session_id, text.encode("utf-8"), filename, role_str)
 
+    def clear_materials(self, session_id: str, role_str: str) -> int:
+        """删除指定角色的所有材料及其关联事实(替换模式上传前调用)。
+
+        Returns:
+            删除的材料数量。
+        """
+        store = data_store.require(session_id)
+        role = MaterialRole(role_str) if role_str in ("plan", "execution") else MaterialRole.PLAN
+
+        to_remove = [mid for mid, d in store.docs.items() if d.role == role]
+        for mid in to_remove:
+            del store.docs[mid]
+            if mid in store.session.material_ids:
+                store.session.material_ids.remove(mid)
+        # 级联删除该角色材料关联的所有事实
+        fact_ids = [
+            fid for fid, f in store.facts.items() if f.source.material_id in to_remove
+        ]
+        for fid in fact_ids:
+            del store.facts[fid]
+
+        # 数据一致性:材料已替换,旧审查报告/复查结果引用的事实已不存在,一并清除。
+        # 否则报告页点"查看原文"会 404,复查对比也会引用已删除的事实。
+        if to_remove and (store.reports or store.rechecks):
+            logger.info(
+                "替换模式:同步清除会话 %s 的旧报告 %d 份、复查结果 %d 份(材料已替换,旧结论失效)",
+                session_id, len(store.reports), len(store.rechecks),
+            )
+            store.reports.clear()
+            store.rechecks.clear()
+
+        if to_remove:
+            logger.info("替换模式:清除会话 %s 的 %s 材料 %d 份、关联事实 %d 条",
+                        session_id, role.value, len(to_remove), len(fact_ids))
+            data_store.persist(session_id)
+        return len(to_remove)
+
 
 evidence_chain = EvidenceChainService()

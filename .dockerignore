@@ -18,3 +18,7 @@ backend/.pytest_cache/
 .git/
 .joycode/
 docs/
+
+# 调试 / 临时文件(开发时产生的 _ 前缀文件,不进镜像)
+backend/_*.py
+backend/_*.json

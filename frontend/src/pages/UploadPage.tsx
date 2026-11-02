@@ -9,14 +9,19 @@ interface Props {
   onBack: () => void
 }
 
-/** 单个上传区域:计划或执行,各自独立的上传按钮和粘贴框。 */
+/** 单个上传区域:计划或执行,各自独立的上传按钮和粘贴框。
+ * 已有同角色材料时,可选择"补充"(追加)或"替换旧版本"(先清空再上传)。
+ */
 function UploadArea({
   sessionId,
   role,
+  existingCount,
   onUploaded,
 }: {
   sessionId: string
   role: MaterialRole
+  /** 当前该角色已有材料数(>0 时显示模式选择) */
+  existingCount: number
   onUploaded: () => void
 }) {
   const isPlan = role === 'plan'
@@ -26,13 +31,14 @@ function UploadArea({
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [lastResult, setLastResult] = useState<IngestResponse | null>(null)
+  const [uploadMode, setUploadMode] = useState<'append' | 'replace'>('append')
   const fileRef = useRef<HTMLInputElement>(null)
 
   async function handleUpload(file: File) {
     setBusy(true)
     setError('')
     try {
-      const res = await uploadFile(sessionId, role, file)
+      const res = await uploadFile(sessionId, role, file, uploadMode)
       setLastResult(res)
       onUploaded()
     } catch (e) {
@@ -47,7 +53,7 @@ function UploadArea({
     setBusy(true)
     setError('')
     try {
-      const res = await addTextMaterial(sessionId, role, pasteName, pasteContent)
+      const res = await addTextMaterial(sessionId, role, pasteName, pasteContent, uploadMode)
       setLastResult(res)
       setPasteContent('')
       onUploaded()
@@ -80,6 +86,32 @@ function UploadArea({
           ? '上传实验设计文档、研究方案等,说明你打算怎么做。'
           : '上传实际代码、配置文件、运行结果等,说明你实际怎么做的。'}
       </p>
+
+      {existingCount > 0 && (
+        <div className="upload-mode-select">
+          <span className="muted">已有 {existingCount} 份{isPlan ? '计划' : '执行'}材料,本次上传:</span>
+          <label className={`mode-option ${uploadMode === 'append' ? 'active' : ''}`}>
+            <input
+              type="radio"
+              name={`mode-${role}`}
+              value="append"
+              checked={uploadMode === 'append'}
+              onChange={() => setUploadMode('append')}
+            />
+            补充(保留旧材料,追加新内容)
+          </label>
+          <label className={`mode-option ${uploadMode === 'replace' ? 'active' : ''}`}>
+            <input
+              type="radio"
+              name={`mode-${role}`}
+              value="replace"
+              checked={uploadMode === 'replace'}
+              onChange={() => setUploadMode('replace')}
+            />
+            替换旧版本(清除旧材料及其事实,再上传)
+          </label>
+        </div>
+      )}
 
       <div className="upload-actions">
         <button disabled={busy} onClick={() => fileRef.current?.click()}>
@@ -198,8 +230,18 @@ export function UploadPage({ sessionId, onNext, onBack }: Props) {
       </p>
 
       <div className="upload-areas">
-        <UploadArea sessionId={sessionId} role="plan" onUploaded={refresh} />
-        <UploadArea sessionId={sessionId} role="execution" onUploaded={refresh} />
+        <UploadArea
+          sessionId={sessionId}
+          role="plan"
+          existingCount={planMaterials.length}
+          onUploaded={refresh}
+        />
+        <UploadArea
+          sessionId={sessionId}
+          role="execution"
+          existingCount={execMaterials.length}
+          onUploaded={refresh}
+        />
       </div>
 
       {materials.length > 0 && (

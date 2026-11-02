@@ -102,8 +102,12 @@ class DataStore:
             self._persist(store)
 
     def _persist(self, store: SessionStore) -> None:
-        """JSON 文件持久化(骨架阶段,崩溃后可恢复)。"""
+        """JSON 文件持久化(骨架阶段,崩溃后可恢复)。
+
+        原子写:先写临时文件再 os.replace 替换,避免写入中途崩溃/并发写导致 JSON 损坏。
+        """
         path = self._data_dir / f"{store.session.session_id}.json"
+        tmp = path.with_suffix(".json.tmp")
         try:
             payload = {
                 "session": store.session.model_dump(),
@@ -112,9 +116,14 @@ class DataStore:
                 "reports": {k: v.model_dump() for k, v in store.reports.items()},
                 "rechecks": {k: v.model_dump() for k, v in store.rechecks.items()},
             }
-            path.write_text(json.dumps(payload, ensure_ascii=False, indent=1), encoding="utf-8")
+            tmp.write_text(json.dumps(payload, ensure_ascii=False, indent=1), encoding="utf-8")
+            os.replace(tmp, path)  # 原子替换:要么完整旧文件,要么完整新文件
         except OSError:
-            pass  # 持久化失败不阻断主流程
+            try:
+                tmp.unlink(missing_ok=True)  # 清理残留临时文件
+            except OSError:
+                pass
+            # 持久化失败不阻断主流程
 
 
 # 全局单例

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import type { DeepFinding, Finding, Followup, ReviewReport } from '../types'
+import type { DeepReviewResult, DeepReviewStatus, Finding, Followup, ReviewReport } from '../types'
 import { CATEGORY_LABELS, LEVEL_LABELS } from '../types'
 import { generateFollowups, runReview } from '../api'
 import { FindingCard } from '../components/FindingCard'
@@ -23,7 +23,7 @@ export function ReportPage({ sessionId, title, claimTexts, onNext, onBack }: Pro
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [followups, setFollowups] = useState<Followup[]>([])
-  const [deepFindings, setDeepFindings] = useState<DeepFinding[]>([])
+  const [deepResult, setDeepResult] = useState<DeepReviewResult | null>(null)
 
   async function run() {
     setBusy(true)
@@ -80,10 +80,32 @@ export function ReportPage({ sessionId, title, claimTexts, onNext, onBack }: Pro
         if (f.what_to_provide) lines.push(`  - 请提供:${f.what_to_provide}`)
       })
     }
-    if (deepFindings.length > 0) {
+    if (deepResult) {
       lines.push('')
       lines.push('## 模型复核(详细修改建议)')
-      deepFindings.forEach((f, i) => {
+      const statusLabel: Record<DeepReviewStatus, string> = {
+        ok: '调用成功',
+        ok_no_findings: '调用成功,未发现需要补充的问题',
+        llm_unavailable: '未接入模型,复核未执行',
+        llm_call_failed: '模型调用失败,复核未完成',
+        llm_parse_failed: '模型输出解析失败,复核未完成',
+      }
+      lines.push(`- **状态**:${statusLabel[deepResult.status] ?? deepResult.status}`)
+      if (deepResult.message) lines.push(`- **说明**:${deepResult.message}`)
+      if (deepResult.coverage.length > 0) {
+        lines.push('- **复核范围**:')
+        deepResult.coverage.forEach((c) => {
+          if (c.checked_chars === 0) {
+            lines.push(`  - ${c.filename}:未检查(超出总量限制,共 ${c.total_chars} 字符)`)
+          } else if (c.truncated) {
+            lines.push(`  - ${c.filename}:检查了前 ${c.checked_chars}/${c.total_chars} 字符,其余未检查`)
+          } else {
+            lines.push(`  - ${c.filename}:已全量检查(${c.total_chars} 字符)`)
+          }
+        })
+      }
+      deepResult.findings.forEach((f, i) => {
+        lines.push('')
         lines.push(`### ${i + 1}. ${f.title}`)
         lines.push('')
         lines.push(`- **级别**:${LEVEL_LABELS[f.level] ?? f.level}`)
@@ -91,7 +113,6 @@ export function ReportPage({ sessionId, title, claimTexts, onNext, onBack }: Pro
         if (f.verified_quote) lines.push(`- **原文引用**:"${f.verified_quote}"`)
         if (f.material_filename) lines.push(`- **来源材料**:${f.material_filename}`)
         if (f.suggestion) lines.push(`- **建议**:${f.suggestion}`)
-        lines.push('')
       })
     }
     for (const level of order) {
@@ -201,7 +222,7 @@ export function ReportPage({ sessionId, title, claimTexts, onNext, onBack }: Pro
           )}
 
           {/* 模型复核:详细修改建议 + 规则盲区 */}
-          <DeepReviewPanel sessionId={sessionId} onFindingsChange={setDeepFindings} />
+          <DeepReviewPanel sessionId={sessionId} onResultChange={setDeepResult} />
 
           {/* 教学小案例:训练实验设计能力 */}
           <div className="teaching-section">

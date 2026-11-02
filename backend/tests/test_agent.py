@@ -143,12 +143,14 @@ def test_heuristic_followups():
     assert "重复" in all_text or "标准差" in all_text, f"追问应覆盖重复运行缺口,实际:{all_text}"
 
 
-def test_deep_review_no_llm_returns_empty():
-    """无模型时,模型复核返回空(不报错)。"""
+def test_deep_review_no_llm_returns_unavailable():
+    """无模型时,模型复核返回 llm_unavailable 状态(不报错)。"""
     session_id = _setup_with_materials()
     review_service.run_review(session_id)
     result = agent_service.deep_review(session_id)
-    assert result == [], "无模型时模型复核应返回空列表"
+    assert result.status == "llm_unavailable", "无模型时状态应为 llm_unavailable"
+    assert result.findings == [], "无模型时发现列表应为空"
+    assert result.llm_available is False
 
 
 def test_preset_teaching_case():
@@ -193,7 +195,7 @@ if __name__ == "__main__":
     test_heuristic_gap_analysis()
     test_heuristic_gap_analysis_empty_session()
     test_heuristic_followups()
-    test_deep_review_no_llm_returns_empty()
+    test_deep_review_no_llm_returns_unavailable()
     test_preset_teaching_case()
     test_agent_does_not_crash_on_fresh_session()
     print("智能体降级模式测试全部通过")

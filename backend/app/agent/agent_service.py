@@ -76,6 +76,12 @@ class DeepFinding:
     suggestion_action: str = ""   # 具体怎么改
     suggestion_reason: str = ""   # 为什么这样改
     suggestion_verify: str = ""   # 如何验证
+    evidence_ids: list[str] = field(default_factory=list)
+    evidence: list[dict] = field(default_factory=list)
+    check_ids: list[str] = field(default_factory=list)
+    evidence_verified: bool = False
+    validation_check_ids: list[str] = field(default_factory=list)
+    validation_status: str = "not_executed"
 
 
 @dataclass
@@ -87,6 +93,8 @@ class MaterialCoverage:
     total_chars: int = 0     # 材料全文长度
     checked_chars: int = 0   # 模型实际检查的字符数
     truncated: bool = False  # 是否有内容未送入模型
+    selection_mode: str = "prefix"
+    ranges: list[dict] = field(default_factory=list)
 
 
 @dataclass
@@ -105,6 +113,10 @@ class DeepReviewResult:
     findings: list[DeepFinding] = field(default_factory=list)
     coverage: list[MaterialCoverage] = field(default_factory=list)
     llm_available: bool = False
+    checks: list[dict] = field(default_factory=list)
+    evidence_catalog: list[dict] = field(default_factory=list)
+    unverified: list[dict] = field(default_factory=list)
+    validation_note: str = ""
 
 
 @dataclass
@@ -401,70 +413,9 @@ class AgentService:
     # ---- 4. 模型复核(复杂上下文,引用校验) ----
 
     def deep_review(self, session_id: str) -> DeepReviewResult:
-        """模型复核:处理规则无法覆盖的复杂上下文。引用必须逐字校验。
-
-        返回 DeepReviewResult,通过 status 区分:
-        调用成功(有/无发现)、未接入模型、调用失败、解析失败。
-        coverage 记录每份材料的实际检查范围(长文档截断时明示)。
-        """
-        store = data_store.require(session_id)
-        session = store.session
-
-        if not llm_client.is_available():
-            return DeepReviewResult(
-                status="llm_unavailable",
-                message="未配置大模型密钥,模型复核不可用。配置 LLM_API_KEY 后可获得深入分析。",
-                llm_available=False,
-            )
-
-        report = store.latest_report()
-        existing = ""
-        if report:
-            existing = "\n".join(f"- [{f.level.value}] {f.title}" for f in report.findings)
-
-        # 拼接材料内容(限制总长度防超 token),同时记录覆盖范围
-        materials_text, coverage = self._materials_text(store, max_chars=8000)
-        claims_text = "\n".join(f"- {c.text}" for c in session.claims)
-
-        raw = llm_client.chat(
-            prompts.DEEP_REVIEW_SYSTEM,
-            prompts.DEEP_REVIEW_USER.format(
-                claims=claims_text,
-                materials_text=materials_text,
-                existing_findings=existing or "(无)",
-            ),
-            max_tokens=3000,
-            timeout=45,
-            retries=1,
-        )
-        if raw is None:
-            return DeepReviewResult(
-                status="llm_call_failed",
-                message="模型调用失败(超时或网络异常),请稍后重试。",
-                coverage=coverage,
-                llm_available=True,
-            )
-
-        data = llm_client.parse_json_response(raw)
-        if not isinstance(data, dict) or not isinstance(data.get("deep_findings"), list):
-            logger.warning(
-                "模型复核输出解析失败,原始输出前200字符:%s", (raw or "")[:200]
-            )
-            return DeepReviewResult(
-                status="llm_parse_failed",
-                message="模型返回内容无法解析为结构化结果,请重试。",
-                coverage=coverage,
-                llm_available=True,
-            )
-
-        findings = self._parse_deep_findings(store, data["deep_findings"])
-        return DeepReviewResult(
-            status="ok" if findings else "ok_no_findings",
-            message="" if findings else "模型已完成复核,未发现需要补充的问题。",
-            findings=findings,
-            coverage=coverage,
-            llm_available=True,
-        )
+        """ID-bound proposals plus full-record program checks; no free filename repair."""
+        from app.agent.grounded_review import run_grounded_review
+        return run_grounded_review(session_id, data_store.require(session_id), llm_client)
 
     def _parse_deep_findings(
         self, store: SessionStore, items: list
@@ -512,7 +463,12 @@ class AgentService:
                 finding.verified_quote = ""
                 finding.material_filename = ""
                 finding.level = "insufficient"
-                finding.reasoning = "引用未通过指定文件校验，以下仅为待核实的模型建议。" + finding.reasoning
+                finding.reasoning = "引用未通过指定文件校验，未采纳这条推断和修改操作。请补充可核对的原始材料。"
+                finding.suggestion_type = "clarify"
+                finding.suggestion = ""
+                finding.suggestion_action = ""
+                finding.suggestion_reason = ""
+                finding.suggestion_verify = ""
             results.append(finding)
         return results
 

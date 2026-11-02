@@ -92,4 +92,5 @@ def get_rules_for(experiment_type: ExperimentType) -> list[RuleBase]:
         PlanExecutionCoverageRule(),
     ]
     from app.rules.numeric_rules import NumericComparisonRule, NumericStabilityRule
-    return [r for r in all_rules if r.experiment_type == experiment_type] + [NumericComparisonRule(), NumericStabilityRule()]
+    from app.rules.calculation_rules import RecallDenominatorRule
+    return [r for r in all_rules if r.experiment_type == experiment_type] + [NumericComparisonRule(), NumericStabilityRule(), RecallDenominatorRule()]

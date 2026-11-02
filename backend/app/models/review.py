@@ -14,6 +14,7 @@ from enum import Enum
 from pydantic import BaseModel, Field
 
 from app.models.evidence import EvidenceRef, ExtractedFact, new_id
+from app.models.checks import ProgramCheck
 
 
 class FindingLevel(str, Enum):
@@ -78,6 +79,7 @@ class ReviewReport(BaseModel):
     material_snapshot: list[dict] = Field(default_factory=list)
     checked_rule_ids: list[str] = Field(default_factory=list)
     failed_rule_ids: list[str] = Field(default_factory=list)
+    program_checks: list[ProgramCheck] = Field(default_factory=list)
 
 
 class RecheckComparison(BaseModel):

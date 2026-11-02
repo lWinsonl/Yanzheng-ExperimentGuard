@@ -1,0 +1,1706 @@
+{
+  "started_at_utc": "2026-11-02T14:13:55.711662+00:00",
+  "source_commit": "a56fad86f26581fb82aeacef638482f81999dc77",
+  "source_sha256": "ba807a77f75a730f9585f968720997e2cecf67b6373bea54fdd724ce76695d26",
+  "python_version": "3.13.7",
+  "provider_calls": 0,
+  "production_requests": 0,
+  "stages": [
+    {
+      "name": "backend-tests",
+      "command": [
+        "C:\\Python313\\python.exe",
+        "-m",
+        "pytest",
+        "tests",
+        "system_tests",
+        "-q",
+        "-rxX",
+        "-o",
+        "faulthandler_timeout=45",
+        "--junitxml=D:\\AI-agent校赛\\agent_competition\\evaluation\\reports\\2026-11-02-grounded\\junit.xml"
+      ],
+      "exit_code": 0,
+      "duration_seconds": 4.606,
+      "log": "backend-tests.log"
+    },
+    {
+      "name": "known-defects-audit",
+      "command": [
+        "C:\\Python313\\python.exe",
+        "-m",
+        "pytest",
+        "system_tests/test_known_defects.py",
+        "-q",
+        "--runxfail",
+        "--junitxml=D:\\AI-agent校赛\\agent_competition\\evaluation\\reports\\2026-11-02-grounded\\known-defects.xml"
+      ],
+      "exit_code": 0,
+      "duration_seconds": 3.765,
+      "log": "known-defects-audit.log",
+      "expected_exit_codes": [
+        0
+      ]
+    },
+    {
+      "name": "frontend-build",
+      "command": [
+        "D:\\npm.cmd",
+        "run",
+        "build"
+      ],
+      "exit_code": 0,
+      "duration_seconds": 0.985,
+      "log": "frontend-build.log"
+    },
+    {
+      "name": "frontend-lint",
+      "command": [
+        "D:\\npm.cmd",
+        "run",
+        "lint"
+      ],
+      "exit_code": 0,
+      "duration_seconds": 0.457,
+      "log": "frontend-lint.log"
+    },
+    {
+      "name": "browser-tests",
+      "command": [
+        "C:\\Python313\\python.exe",
+        "-m",
+        "evaluation.run_browser"
+      ],
+      "exit_code": 0,
+      "duration_seconds": 19.191,
+      "log": "browser-tests.log"
+    }
+  ],
+  "tests": {
+    "total": 196,
+    "passed": 196,
+    "failed": 0,
+    "errors": 0,
+    "skipped": 0,
+    "xfailed": 0,
+    "known_defects": []
+  },
+  "benchmark": {
+    "dataset_id": "synthetic-capability-probes-v1",
+    "dataset_sha256": "79fdf95c0504aa06b90b4c2d0db6f9f5d45ff995d049dd4247e3ff0582b073c2",
+    "dataset_status": "DEVELOPMENT_ONLY_NOT_HUMAN_VALIDATED",
+    "condition": "offline_rule_pipeline",
+    "model_calls": 0,
+    "summary": {
+      "n_cases": 24,
+      "label_counts": {
+        "supported": 9,
+        "contradicted": 9,
+        "insufficient": 6
+      },
+      "confusion_matrix": {
+        "supported": {
+          "supported": 9,
+          "contradicted": 0,
+          "insufficient": 0,
+          "error": 0
+        },
+        "contradicted": {
+          "supported": 0,
+          "contradicted": 9,
+          "insufficient": 0,
+          "error": 0
+        },
+        "insufficient": {
+          "supported": 0,
+          "contradicted": 0,
+          "insufficient": 6,
+          "error": 0
+        }
+      },
+      "per_class": {
+        "supported": {
+          "tp": 9,
+          "fp": 0,
+          "fn": 0,
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "support": 9
+        },
+        "contradicted": {
+          "tp": 9,
+          "fp": 0,
+          "fn": 0,
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "support": 9
+        },
+        "insufficient": {
+          "tp": 6,
+          "fp": 0,
+          "fn": 0,
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "support": 6
+        }
+      },
+      "accuracy": 1.0,
+      "macro_f1": 1.0,
+      "decidable_cases": 18,
+      "conclusive_cases": 18,
+      "decision_coverage": 1.0,
+      "abstention_on_decidable": 0.0,
+      "selective_accuracy": 1.0,
+      "false_conclusive_count": 0,
+      "false_conclusive_rate": 0.0,
+      "insufficient_recognition": 1.0,
+      "execution_error_count": 0,
+      "citations": 120,
+      "valid_citations": 120,
+      "anchor_validity": 1.0,
+      "unit_accuracy_wilson95": null
+    },
+    "by_aspect": {
+      "comparison": {
+        "n_cases": 8,
+        "label_counts": {
+          "supported": 3,
+          "contradicted": 3,
+          "insufficient": 2
+        },
+        "confusion_matrix": {
+          "supported": {
+            "supported": 3,
+            "contradicted": 0,
+            "insufficient": 0,
+            "error": 0
+          },
+          "contradicted": {
+            "supported": 0,
+            "contradicted": 3,
+            "insufficient": 0,
+            "error": 0
+          },
+          "insufficient": {
+            "supported": 0,
+            "contradicted": 0,
+            "insufficient": 2,
+            "error": 0
+          }
+        },
+        "per_class": {
+          "supported": {
+            "tp": 3,
+            "fp": 0,
+            "fn": 0,
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1": 1.0,
+            "support": 3
+          },
+          "contradicted": {
+            "tp": 3,
+            "fp": 0,
+            "fn": 0,
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1": 1.0,
+            "support": 3
+          },
+          "insufficient": {
+            "tp": 2,
+            "fp": 0,
+            "fn": 0,
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1": 1.0,
+            "support": 2
+          }
+        },
+        "accuracy": 1.0,
+        "macro_f1": 1.0,
+        "decidable_cases": 6,
+        "conclusive_cases": 6,
+        "decision_coverage": 1.0,
+        "abstention_on_decidable": 0.0,
+        "selective_accuracy": 1.0,
+        "false_conclusive_count": 0,
+        "false_conclusive_rate": 0.0,
+        "insufficient_recognition": 1.0,
+        "execution_error_count": 0,
+        "citations": 55,
+        "valid_citations": 55,
+        "anchor_validity": 1.0,
+        "unit_accuracy_wilson95": null
+      },
+      "scope": {
+        "n_cases": 8,
+        "label_counts": {
+          "supported": 3,
+          "contradicted": 3,
+          "insufficient": 2
+        },
+        "confusion_matrix": {
+          "supported": {
+            "supported": 3,
+            "contradicted": 0,
+            "insufficient": 0,
+            "error": 0
+          },
+          "contradicted": {
+            "supported": 0,
+            "contradicted": 3,
+            "insufficient": 0,
+            "error": 0
+          },
+          "insufficient": {
+            "supported": 0,
+            "contradicted": 0,
+            "insufficient": 2,
+            "error": 0
+          }
+        },
+        "per_class": {
+          "supported": {
+            "tp": 3,
+            "fp": 0,
+            "fn": 0,
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1": 1.0,
+            "support": 3
+          },
+          "contradicted": {
+            "tp": 3,
+            "fp": 0,
+            "fn": 0,
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1": 1.0,
+            "support": 3
+          },
+          "insufficient": {
+            "tp": 2,
+            "fp": 0,
+            "fn": 0,
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1": 1.0,
+            "support": 2
+          }
+        },
+        "accuracy": 1.0,
+        "macro_f1": 1.0,
+        "decidable_cases": 6,
+        "conclusive_cases": 6,
+        "decision_coverage": 1.0,
+        "abstention_on_decidable": 0.0,
+        "selective_accuracy": 1.0,
+        "false_conclusive_count": 0,
+        "false_conclusive_rate": 0.0,
+        "insufficient_recognition": 1.0,
+        "execution_error_count": 0,
+        "citations": 33,
+        "valid_citations": 33,
+        "anchor_validity": 1.0,
+        "unit_accuracy_wilson95": null
+      },
+      "stability": {
+        "n_cases": 8,
+        "label_counts": {
+          "supported": 3,
+          "contradicted": 3,
+          "insufficient": 2
+        },
+        "confusion_matrix": {
+          "supported": {
+            "supported": 3,
+            "contradicted": 0,
+            "insufficient": 0,
+            "error": 0
+          },
+          "contradicted": {
+            "supported": 0,
+            "contradicted": 3,
+            "insufficient": 0,
+            "error": 0
+          },
+          "insufficient": {
+            "supported": 0,
+            "contradicted": 0,
+            "insufficient": 2,
+            "error": 0
+          }
+        },
+        "per_class": {
+          "supported": {
+            "tp": 3,
+            "fp": 0,
+            "fn": 0,
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1": 1.0,
+            "support": 3
+          },
+          "contradicted": {
+            "tp": 3,
+            "fp": 0,
+            "fn": 0,
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1": 1.0,
+            "support": 3
+          },
+          "insufficient": {
+            "tp": 2,
+            "fp": 0,
+            "fn": 0,
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1": 1.0,
+            "support": 2
+          }
+        },
+        "accuracy": 1.0,
+        "macro_f1": 1.0,
+        "decidable_cases": 6,
+        "conclusive_cases": 6,
+        "decision_coverage": 1.0,
+        "abstention_on_decidable": 0.0,
+        "selective_accuracy": 1.0,
+        "false_conclusive_count": 0,
+        "false_conclusive_rate": 0.0,
+        "insufficient_recognition": 1.0,
+        "execution_error_count": 0,
+        "citations": 32,
+        "valid_citations": 32,
+        "anchor_validity": 1.0,
+        "unit_accuracy_wilson95": null
+      }
+    },
+    "by_domain": {
+      "algorithm_system": {
+        "n_cases": 6,
+        "label_counts": {
+          "supported": 2,
+          "contradicted": 2,
+          "insufficient": 2
+        },
+        "confusion_matrix": {
+          "supported": {
+            "supported": 2,
+            "contradicted": 0,
+            "insufficient": 0,
+            "error": 0
+          },
+          "contradicted": {
+            "supported": 0,
+            "contradicted": 2,
+            "insufficient": 0,
+            "error": 0
+          },
+          "insufficient": {
+            "supported": 0,
+            "contradicted": 0,
+            "insufficient": 2,
+            "error": 0
+          }
+        },
+        "per_class": {
+          "supported": {
+            "tp": 2,
+            "fp": 0,
+            "fn": 0,
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1": 1.0,
+            "support": 2
+          },
+          "contradicted": {
+            "tp": 2,
+            "fp": 0,
+            "fn": 0,
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1": 1.0,
+            "support": 2
+          },
+          "insufficient": {
+            "tp": 2,
+            "fp": 0,
+            "fn": 0,
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1": 1.0,
+            "support": 2
+          }
+        },
+        "accuracy": 1.0,
+        "macro_f1": 1.0,
+        "decidable_cases": 4,
+        "conclusive_cases": 4,
+        "decision_coverage": 1.0,
+        "abstention_on_decidable": 0.0,
+        "selective_accuracy": 1.0,
+        "false_conclusive_count": 0,
+        "false_conclusive_rate": 0.0,
+        "insufficient_recognition": 1.0,
+        "execution_error_count": 0,
+        "citations": 26,
+        "valid_citations": 26,
+        "anchor_validity": 1.0,
+        "unit_accuracy_wilson95": null
+      },
+      "data_model": {
+        "n_cases": 18,
+        "label_counts": {
+          "supported": 7,
+          "contradicted": 7,
+          "insufficient": 4
+        },
+        "confusion_matrix": {
+          "supported": {
+            "supported": 7,
+            "contradicted": 0,
+            "insufficient": 0,
+            "error": 0
+          },
+          "contradicted": {
+            "supported": 0,
+            "contradicted": 7,
+            "insufficient": 0,
+            "error": 0
+          },
+          "insufficient": {
+            "supported": 0,
+            "contradicted": 0,
+            "insufficient": 4,
+            "error": 0
+          }
+        },
+        "per_class": {
+          "supported": {
+            "tp": 7,
+            "fp": 0,
+            "fn": 0,
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1": 1.0,
+            "support": 7
+          },
+          "contradicted": {
+            "tp": 7,
+            "fp": 0,
+            "fn": 0,
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1": 1.0,
+            "support": 7
+          },
+          "insufficient": {
+            "tp": 4,
+            "fp": 0,
+            "fn": 0,
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1": 1.0,
+            "support": 4
+          }
+        },
+        "accuracy": 1.0,
+        "macro_f1": 1.0,
+        "decidable_cases": 14,
+        "conclusive_cases": 14,
+        "decision_coverage": 1.0,
+        "abstention_on_decidable": 0.0,
+        "selective_accuracy": 1.0,
+        "false_conclusive_count": 0,
+        "false_conclusive_rate": 0.0,
+        "insufficient_recognition": 1.0,
+        "execution_error_count": 0,
+        "citations": 94,
+        "valid_citations": 94,
+        "anchor_validity": 1.0,
+        "unit_accuracy_wilson95": null
+      }
+    },
+    "latency": {
+      "median_ms": 8.89475000440143,
+      "nearest_rank_p95_ms": 18.920400005299598,
+      "scope": "本机串行、含提取/确认/JSON保存；无网络、非生产性能SLA"
+    },
+    "cases": [
+      {
+        "case_id": "S01",
+        "project_id": "synthetic-S01",
+        "domain": "data_model",
+        "aspect": "scope",
+        "gold": "supported",
+        "prediction": "supported",
+        "rationale": "两侧非空编号列表无交集",
+        "citations": 3,
+        "valid_citations": 3,
+        "missing_target_subclaim": false,
+        "conflicting_edges": false,
+        "edge_bases": [
+          "提供的训练/测试实体编号列表无交集；仅支持这些列表的实体隔离，不验证列表来源、完整性或其他泄漏。"
+        ],
+        "extracted_facts": 1,
+        "rule_findings": [
+          {
+            "rule_id": "dm_split_consistency",
+            "level": "insufficient",
+            "title": "缺少计划或执行一侧的数据划分信息,无法核对一致性"
+          },
+          {
+            "rule_id": "dm_metric",
+            "level": "insufficient",
+            "title": "未发现任何评价指标,无法评估结论是否被实验支持"
+          }
+        ],
+        "latency_ms": 154.91650003241375,
+        "correct": true
+      },
+      {
+        "case_id": "S02",
+        "project_id": "synthetic-S02",
+        "domain": "data_model",
+        "aspect": "scope",
+        "gold": "supported",
+        "prediction": "supported",
+        "rationale": "Unicode 编号列表无交集",
+        "citations": 3,
+        "valid_citations": 3,
+        "missing_target_subclaim": false,
+        "conflicting_edges": false,
+        "edge_bases": [
+          "提供的训练/测试实体编号列表无交集；仅支持这些列表的实体隔离，不验证列表来源、完整性或其他泄漏。"
+        ],
+        "extracted_facts": 1,
+        "rule_findings": [
+          {
+            "rule_id": "dm_split_consistency",
+            "level": "insufficient",
+            "title": "缺少计划或执行一侧的数据划分信息,无法核对一致性"
+          },
+          {
+            "rule_id": "dm_metric",
+            "level": "insufficient",
+            "title": "未发现任何评价指标,无法评估结论是否被实验支持"
+          }
+        ],
+        "latency_ms": 9.966100042220205,
+        "correct": true
+      },
+      {
+        "case_id": "S03",
+        "project_id": "synthetic-S03",
+        "domain": "data_model",
+        "aspect": "scope",
+        "gold": "supported",
+        "prediction": "supported",
+        "rationale": "整数编号列表无交集",
+        "citations": 3,
+        "valid_citations": 3,
+        "missing_target_subclaim": false,
+        "conflicting_edges": false,
+        "edge_bases": [
+          "提供的训练/测试实体编号列表无交集；仅支持这些列表的实体隔离，不验证列表来源、完整性或其他泄漏。"
+        ],
+        "extracted_facts": 1,
+        "rule_findings": [
+          {
+            "rule_id": "dm_split_consistency",
+            "level": "insufficient",
+            "title": "缺少计划或执行一侧的数据划分信息,无法核对一致性"
+          },
+          {
+            "rule_id": "dm_metric",
+            "level": "insufficient",
+            "title": "未发现任何评价指标,无法评估结论是否被实验支持"
+          }
+        ],
+        "latency_ms": 6.531200022436678,
+        "correct": true
+      },
+      {
+        "case_id": "S04",
+        "project_id": "synthetic-S04",
+        "domain": "data_model",
+        "aspect": "scope",
+        "gold": "contradicted",
+        "prediction": "contradicted",
+        "rationale": "编号 B 同时存在于两侧",
+        "citations": 4,
+        "valid_citations": 4,
+        "missing_target_subclaim": false,
+        "conflicting_edges": false,
+        "edge_bases": [
+          "提供的实体列表存在交集：B"
+        ],
+        "extracted_facts": 1,
+        "rule_findings": [
+          {
+            "rule_id": "dm_split_consistency",
+            "level": "insufficient",
+            "title": "缺少计划或执行一侧的数据划分信息,无法核对一致性"
+          },
+          {
+            "rule_id": "dm_claim_generalization",
+            "level": "contradiction",
+            "title": "提供的训练/测试实体编号存在交集，与未见实体主张冲突"
+          },
+          {
+            "rule_id": "dm_metric",
+            "level": "insufficient",
+            "title": "未发现任何评价指标,无法评估结论是否被实验支持"
+          }
+        ],
+        "latency_ms": 7.459199987351894,
+        "correct": true
+      },
+      {
+        "case_id": "S05",
+        "project_id": "synthetic-S05",
+        "domain": "data_model",
+        "aspect": "scope",
+        "gold": "contradicted",
+        "prediction": "contradicted",
+        "rationale": "本题规定整数字符串与整数代表同一实体，编号1重叠",
+        "citations": 4,
+        "valid_citations": 4,
+        "missing_target_subclaim": false,
+        "conflicting_edges": false,
+        "edge_bases": [
+          "提供的实体列表存在交集：1"
+        ],
+        "extracted_facts": 1,
+        "rule_findings": [
+          {
+            "rule_id": "dm_split_consistency",
+            "level": "insufficient",
+            "title": "缺少计划或执行一侧的数据划分信息,无法核对一致性"
+          },
+          {
+            "rule_id": "dm_claim_generalization",
+            "level": "contradiction",
+            "title": "提供的训练/测试实体编号存在交集，与未见实体主张冲突"
+          },
+          {
+            "rule_id": "dm_metric",
+            "level": "insufficient",
+            "title": "未发现任何评价指标,无法评估结论是否被实验支持"
+          }
+        ],
+        "latency_ms": 6.09239999903366,
+        "correct": true
+      },
+      {
+        "case_id": "S06",
+        "project_id": "synthetic-S06",
+        "domain": "data_model",
+        "aspect": "scope",
+        "gold": "contradicted",
+        "prediction": "contradicted",
+        "rationale": "多实体列表中的局部重叠也违反无交集主张",
+        "citations": 4,
+        "valid_citations": 4,
+        "missing_target_subclaim": false,
+        "conflicting_edges": false,
+        "edge_bases": [
+          "提供的实体列表存在交集：C"
+        ],
+        "extracted_facts": 1,
+        "rule_findings": [
+          {
+            "rule_id": "dm_split_consistency",
+            "level": "insufficient",
+            "title": "缺少计划或执行一侧的数据划分信息,无法核对一致性"
+          },
+          {
+            "rule_id": "dm_claim_generalization",
+            "level": "contradiction",
+            "title": "提供的训练/测试实体编号存在交集，与未见实体主张冲突"
+          },
+          {
+            "rule_id": "dm_metric",
+            "level": "insufficient",
+            "title": "未发现任何评价指标,无法评估结论是否被实验支持"
+          }
+        ],
+        "latency_ms": 5.985099996905774,
+        "correct": true
+      },
+      {
+        "case_id": "S07",
+        "project_id": "synthetic-S07",
+        "domain": "data_model",
+        "aspect": "scope",
+        "gold": "insufficient",
+        "prediction": "insufficient",
+        "rationale": "分组计划没有给出实际列表",
+        "citations": 4,
+        "valid_citations": 4,
+        "missing_target_subclaim": false,
+        "conflicting_edges": false,
+        "edge_bases": [
+          "存在划分相关材料；函数名称或分组计划不能证明实际实体是否重叠，需提供训练/测试实体编号。"
+        ],
+        "extracted_facts": 1,
+        "rule_findings": [
+          {
+            "rule_id": "dm_split_consistency",
+            "level": "insufficient",
+            "title": "缺少计划或执行一侧的数据划分信息,无法核对一致性"
+          },
+          {
+            "rule_id": "dm_claim_generalization",
+            "level": "insufficient",
+            "title": "只有计划或缺少实际划分证据，尚不能核实未见实体泛化"
+          },
+          {
+            "rule_id": "dm_metric",
+            "level": "insufficient",
+            "title": "未发现任何评价指标,无法评估结论是否被实验支持"
+          }
+        ],
+        "latency_ms": 6.440800032578409,
+        "correct": true
+      },
+      {
+        "case_id": "S08",
+        "project_id": "synthetic-S08",
+        "domain": "data_model",
+        "aspect": "scope",
+        "gold": "insufficient",
+        "prediction": "insufficient",
+        "rationale": "函数可能在设备编号上调用，既不能证明重叠也不能证明无交集",
+        "citations": 8,
+        "valid_citations": 8,
+        "missing_target_subclaim": false,
+        "conflicting_edges": false,
+        "edge_bases": [
+          "存在划分相关材料；函数名称或分组计划不能证明实际实体是否重叠，需提供训练/测试实体编号。",
+          "存在划分相关材料；函数名称或分组计划不能证明实际实体是否重叠，需提供训练/测试实体编号。"
+        ],
+        "extracted_facts": 2,
+        "rule_findings": [
+          {
+            "rule_id": "dm_split_consistency",
+            "level": "insufficient",
+            "title": "缺少计划或执行一侧的数据划分信息,无法核对一致性"
+          },
+          {
+            "rule_id": "dm_claim_generalization",
+            "level": "risk",
+            "title": "执行出现随机划分线索，未核实划分单位与实体交集，存在泄漏风险"
+          },
+          {
+            "rule_id": "dm_metric",
+            "level": "insufficient",
+            "title": "未发现任何评价指标,无法评估结论是否被实验支持"
+          }
+        ],
+        "latency_ms": 8.495200017932802,
+        "correct": true
+      },
+      {
+        "case_id": "C01",
+        "project_id": "synthetic-C01",
+        "domain": "data_model",
+        "aspect": "comparison",
+        "gold": "supported",
+        "prediction": "supported",
+        "rationale": "同一指标与条件，按明确的指标方向比较表中点估计；不要求推断显著性",
+        "citations": 8,
+        "valid_citations": 8,
+        "missing_target_subclaim": false,
+        "conflicting_edges": false,
+        "edge_bases": [
+          "在记录声明的相同划分、环境、预处理与预算下，F1：A=0.85，B=0.72；该指标越大越好。仅核对这些点估计，不推断显著性、其他测试或总体优势；未独立验证记录来源。",
+          "仅发现相关材料；需完整的方法、指标方向、双方数值与相同测试条件，才能核对限定表中的比较。",
+          "仅发现相关材料；需完整的方法、指标方向、双方数值与相同测试条件，才能核对限定表中的比较。",
+          "仅发现相关材料；需完整的方法、指标方向、双方数值与相同测试条件，才能核对限定表中的比较。"
+        ],
+        "extracted_facts": 4,
+        "rule_findings": [],
+        "latency_ms": 18.920400005299598,
+        "correct": true
+      },
+      {
+        "case_id": "C02",
+        "project_id": "synthetic-C02",
+        "domain": "data_model",
+        "aspect": "comparison",
+        "gold": "supported",
+        "prediction": "supported",
+        "rationale": "同一指标与条件，按明确的指标方向比较表中点估计；不要求推断显著性",
+        "citations": 8,
+        "valid_citations": 8,
+        "missing_target_subclaim": false,
+        "conflicting_edges": false,
+        "edge_bases": [
+          "在记录声明的相同划分、环境、预处理与预算下，RMSE：A=0.12，B=0.2；该指标越小越好。仅核对这些点估计，不推断显著性、其他测试或总体优势；未独立验证记录来源。",
+          "仅发现相关材料；需完整的方法、指标方向、双方数值与相同测试条件，才能核对限定表中的比较。",
+          "仅发现相关材料；需完整的方法、指标方向、双方数值与相同测试条件，才能核对限定表中的比较。",
+          "仅发现相关材料；需完整的方法、指标方向、双方数值与相同测试条件，才能核对限定表中的比较。"
+        ],
+        "extracted_facts": 4,
+        "rule_findings": [],
+        "latency_ms": 10.32980001764372,
+        "correct": true
+      },
+      {
+        "case_id": "C03",
+        "project_id": "synthetic-C03",
+        "domain": "algorithm_system",
+        "aspect": "comparison",
+        "gold": "supported",
+        "prediction": "supported",
+        "rationale": "同一指标与条件，按明确的指标方向比较表中点估计；不要求推断显著性",
+        "citations": 6,
+        "valid_citations": 6,
+        "missing_target_subclaim": false,
+        "conflicting_edges": false,
+        "edge_bases": [
+          "在记录声明的相同划分、环境、预处理与预算下，latency_ms：A=10，B=15；该指标越小越好。仅核对这些点估计，不推断显著性、其他测试或总体优势；未独立验证记录来源。",
+          "仅发现相关材料；需完整的方法、指标方向、双方数值与相同测试条件，才能核对限定表中的比较。",
+          "仅发现相关材料；需完整的方法、指标方向、双方数值与相同测试条件，才能核对限定表中的比较。"
+        ],
+        "extracted_facts": 3,
+        "rule_findings": [
+          {
+            "rule_id": "as_plan_exec_coverage",
+            "level": "insufficient",
+            "title": "缺少计划或执行材料,无法进行对照审查"
+          }
+        ],
+        "latency_ms": 9.656600013840944,
+        "correct": true
+      },
+      {
+        "case_id": "C04",
+        "project_id": "synthetic-C04",
+        "domain": "data_model",
+        "aspect": "comparison",
+        "gold": "contradicted",
+        "prediction": "contradicted",
+        "rationale": "同一指标与条件，按明确的指标方向比较表中点估计；不要求推断显著性",
+        "citations": 9,
+        "valid_citations": 9,
+        "missing_target_subclaim": false,
+        "conflicting_edges": false,
+        "edge_bases": [
+          "在记录声明的相同划分、环境、预处理与预算下，F1：A=0.65，B=0.72；该指标越大越好。仅核对这些点估计，不推断显著性、其他测试或总体优势；未独立验证记录来源。",
+          "仅发现相关材料；需完整的方法、指标方向、双方数值与相同测试条件，才能核对限定表中的比较。",
+          "仅发现相关材料；需完整的方法、指标方向、双方数值与相同测试条件，才能核对限定表中的比较。",
+          "仅发现相关材料；需完整的方法、指标方向、双方数值与相同测试条件，才能核对限定表中的比较。"
+        ],
+        "extracted_facts": 4,
+        "rule_findings": [
+          {
+            "rule_id": "numeric_comparison",
+            "level": "contradiction",
+            "title": "提供的数值不支持该限定比较主张"
+          }
+        ],
+        "latency_ms": 10.417299985419959,
+        "correct": true
+      },
+      {
+        "case_id": "C05",
+        "project_id": "synthetic-C05",
+        "domain": "data_model",
+        "aspect": "comparison",
+        "gold": "contradicted",
+        "prediction": "contradicted",
+        "rationale": "同一指标与条件，按明确的指标方向比较表中点估计；不要求推断显著性",
+        "citations": 9,
+        "valid_citations": 9,
+        "missing_target_subclaim": false,
+        "conflicting_edges": false,
+        "edge_bases": [
+          "在记录声明的相同划分、环境、预处理与预算下，RMSE：A=0.3，B=0.2；该指标越小越好。仅核对这些点估计，不推断显著性、其他测试或总体优势；未独立验证记录来源。",
+          "仅发现相关材料；需完整的方法、指标方向、双方数值与相同测试条件，才能核对限定表中的比较。",
+          "仅发现相关材料；需完整的方法、指标方向、双方数值与相同测试条件，才能核对限定表中的比较。",
+          "仅发现相关材料；需完整的方法、指标方向、双方数值与相同测试条件，才能核对限定表中的比较。"
+        ],
+        "extracted_facts": 4,
+        "rule_findings": [
+          {
+            "rule_id": "numeric_comparison",
+            "level": "contradiction",
+            "title": "提供的数值不支持该限定比较主张"
+          }
+        ],
+        "latency_ms": 10.681900021154433,
+        "correct": true
+      },
+      {
+        "case_id": "C06",
+        "project_id": "synthetic-C06",
+        "domain": "algorithm_system",
+        "aspect": "comparison",
+        "gold": "contradicted",
+        "prediction": "contradicted",
+        "rationale": "同一指标与条件，按明确的指标方向比较表中点估计；不要求推断显著性",
+        "citations": 7,
+        "valid_citations": 7,
+        "missing_target_subclaim": false,
+        "conflicting_edges": false,
+        "edge_bases": [
+          "在记录声明的相同划分、环境、预处理与预算下，latency_ms：A=20，B=15；该指标越小越好。仅核对这些点估计，不推断显著性、其他测试或总体优势；未独立验证记录来源。",
+          "仅发现相关材料；需完整的方法、指标方向、双方数值与相同测试条件，才能核对限定表中的比较。",
+          "仅发现相关材料；需完整的方法、指标方向、双方数值与相同测试条件，才能核对限定表中的比较。"
+        ],
+        "extracted_facts": 3,
+        "rule_findings": [
+          {
+            "rule_id": "as_plan_exec_coverage",
+            "level": "insufficient",
+            "title": "缺少计划或执行材料,无法进行对照审查"
+          },
+          {
+            "rule_id": "numeric_comparison",
+            "level": "contradiction",
+            "title": "提供的数值不支持该限定比较主张"
+          }
+        ],
+        "latency_ms": 10.598399967420846,
+        "correct": true
+      },
+      {
+        "case_id": "C07",
+        "project_id": "synthetic-C07",
+        "domain": "data_model",
+        "aspect": "comparison",
+        "gold": "insufficient",
+        "prediction": "insufficient",
+        "rationale": "准确率和F1不是同一指标，不能直接比较",
+        "citations": 6,
+        "valid_citations": 6,
+        "missing_target_subclaim": false,
+        "conflicting_edges": false,
+        "edge_bases": [
+          "仅发现相关材料；需完整的方法、指标方向、双方数值与相同测试条件，才能核对限定表中的比较。",
+          "仅发现相关材料；需完整的方法、指标方向、双方数值与相同测试条件，才能核对限定表中的比较。",
+          "仅发现相关材料；需完整的方法、指标方向、双方数值与相同测试条件，才能核对限定表中的比较。"
+        ],
+        "extracted_facts": 3,
+        "rule_findings": [],
+        "latency_ms": 9.340799995698035,
+        "correct": true
+      },
+      {
+        "case_id": "C08",
+        "project_id": "synthetic-C08",
+        "domain": "algorithm_system",
+        "aspect": "comparison",
+        "gold": "insufficient",
+        "prediction": "insufficient",
+        "rationale": "测试负载不同，数值不能归因于算法",
+        "citations": 2,
+        "valid_citations": 2,
+        "missing_target_subclaim": false,
+        "conflicting_edges": false,
+        "edge_bases": [
+          "仅发现相关材料；需完整的方法、指标方向、双方数值与相同测试条件，才能核对限定表中的比较。"
+        ],
+        "extracted_facts": 1,
+        "rule_findings": [
+          {
+            "rule_id": "as_metric_check",
+            "level": "insufficient",
+            "title": "主张涉及性能比较,但未提供任何评价指标数据"
+          },
+          {
+            "rule_id": "as_plan_exec_coverage",
+            "level": "insufficient",
+            "title": "缺少计划或执行材料,无法进行对照审查"
+          }
+        ],
+        "latency_ms": 6.981999962590635,
+        "correct": true
+      },
+      {
+        "case_id": "T01",
+        "project_id": "synthetic-T01",
+        "domain": "data_model",
+        "aspect": "stability",
+        "gold": "supported",
+        "prediction": "supported",
+        "rationale": "仅比较已给出的同条件样本标准差；有限样本描述不等于总体稳定性证明",
+        "citations": 3,
+        "valid_citations": 3,
+        "missing_target_subclaim": false,
+        "conflicting_edges": false,
+        "edge_bases": [
+          "仅对所报告的同条件5次运行，F1样本标准差为A=0.01、B=0.04。据此核对该样本的波动大小，不证明未来更稳定、显著性或已排除偶然性；未独立验证运行记录来源。"
+        ],
+        "extracted_facts": 2,
+        "rule_findings": [
+          {
+            "rule_id": "dm_baseline",
+            "level": "insufficient",
+            "title": "主张包含比较关系,但材料中未发现基线/对比方法的运行记录"
+          }
+        ],
+        "latency_ms": 8.734199975151569,
+        "correct": true
+      },
+      {
+        "case_id": "T02",
+        "project_id": "synthetic-T02",
+        "domain": "algorithm_system",
+        "aspect": "stability",
+        "gold": "supported",
+        "prediction": "supported",
+        "rationale": "仅比较已给出的同条件样本标准差；有限样本描述不等于总体稳定性证明",
+        "citations": 2,
+        "valid_citations": 2,
+        "missing_target_subclaim": false,
+        "conflicting_edges": false,
+        "edge_bases": [
+          "仅对所报告的同条件5次运行，latency_ms样本标准差为A=1、B=4。据此核对该样本的波动大小，不证明未来更稳定、显著性或已排除偶然性；未独立验证运行记录来源。"
+        ],
+        "extracted_facts": 1,
+        "rule_findings": [
+          {
+            "rule_id": "as_baseline_check",
+            "level": "insufficient",
+            "title": "主张涉及算法/系统对比,但未提供基线方法信息"
+          },
+          {
+            "rule_id": "as_metric_check",
+            "level": "insufficient",
+            "title": "主张涉及性能比较,但未提供任何评价指标数据"
+          },
+          {
+            "rule_id": "as_plan_exec_coverage",
+            "level": "insufficient",
+            "title": "缺少计划或执行材料,无法进行对照审查"
+          }
+        ],
+        "latency_ms": 7.55470001604408,
+        "correct": true
+      },
+      {
+        "case_id": "T03",
+        "project_id": "synthetic-T03",
+        "domain": "data_model",
+        "aspect": "stability",
+        "gold": "supported",
+        "prediction": "supported",
+        "rationale": "仅比较已给出的同条件样本标准差；有限样本描述不等于总体稳定性证明",
+        "citations": 3,
+        "valid_citations": 3,
+        "missing_target_subclaim": false,
+        "conflicting_edges": false,
+        "edge_bases": [
+          "仅对所报告的同条件5次运行，accuracy样本标准差为A=0.02、B=0.05。据此核对该样本的波动大小，不证明未来更稳定、显著性或已排除偶然性；未独立验证运行记录来源。"
+        ],
+        "extracted_facts": 2,
+        "rule_findings": [
+          {
+            "rule_id": "dm_baseline",
+            "level": "insufficient",
+            "title": "主张包含比较关系,但材料中未发现基线/对比方法的运行记录"
+          }
+        ],
+        "latency_ms": 9.35050001135096,
+        "correct": true
+      },
+      {
+        "case_id": "T04",
+        "project_id": "synthetic-T04",
+        "domain": "data_model",
+        "aspect": "stability",
+        "gold": "contradicted",
+        "prediction": "contradicted",
+        "rationale": "仅比较已给出的同条件样本标准差；有限样本描述不等于总体稳定性证明",
+        "citations": 4,
+        "valid_citations": 4,
+        "missing_target_subclaim": false,
+        "conflicting_edges": false,
+        "edge_bases": [
+          "仅对所报告的同条件5次运行，F1样本标准差为A=0.04、B=0.01。据此核对该样本的波动大小，不证明未来更稳定、显著性或已排除偶然性；未独立验证运行记录来源。"
+        ],
+        "extracted_facts": 2,
+        "rule_findings": [
+          {
+            "rule_id": "dm_baseline",
+            "level": "insufficient",
+            "title": "主张包含比较关系,但材料中未发现基线/对比方法的运行记录"
+          },
+          {
+            "rule_id": "numeric_stability",
+            "level": "contradiction",
+            "title": "提供的数值不支持该限定比较主张"
+          }
+        ],
+        "latency_ms": 8.09110002592206,
+        "correct": true
+      },
+      {
+        "case_id": "T05",
+        "project_id": "synthetic-T05",
+        "domain": "algorithm_system",
+        "aspect": "stability",
+        "gold": "contradicted",
+        "prediction": "contradicted",
+        "rationale": "仅比较已给出的同条件样本标准差；有限样本描述不等于总体稳定性证明",
+        "citations": 3,
+        "valid_citations": 3,
+        "missing_target_subclaim": false,
+        "conflicting_edges": false,
+        "edge_bases": [
+          "仅对所报告的同条件5次运行，latency_ms样本标准差为A=4、B=1。据此核对该样本的波动大小，不证明未来更稳定、显著性或已排除偶然性；未独立验证运行记录来源。"
+        ],
+        "extracted_facts": 1,
+        "rule_findings": [
+          {
+            "rule_id": "as_baseline_check",
+            "level": "insufficient",
+            "title": "主张涉及算法/系统对比,但未提供基线方法信息"
+          },
+          {
+            "rule_id": "as_metric_check",
+            "level": "insufficient",
+            "title": "主张涉及性能比较,但未提供任何评价指标数据"
+          },
+          {
+            "rule_id": "as_plan_exec_coverage",
+            "level": "insufficient",
+            "title": "缺少计划或执行材料,无法进行对照审查"
+          },
+          {
+            "rule_id": "numeric_stability",
+            "level": "contradiction",
+            "title": "提供的数值不支持该限定比较主张"
+          }
+        ],
+        "latency_ms": 8.17229994572699,
+        "correct": true
+      },
+      {
+        "case_id": "T06",
+        "project_id": "synthetic-T06",
+        "domain": "data_model",
+        "aspect": "stability",
+        "gold": "contradicted",
+        "prediction": "contradicted",
+        "rationale": "仅比较已给出的同条件样本标准差；有限样本描述不等于总体稳定性证明",
+        "citations": 4,
+        "valid_citations": 4,
+        "missing_target_subclaim": false,
+        "conflicting_edges": false,
+        "edge_bases": [
+          "仅对所报告的同条件5次运行，accuracy样本标准差为A=0.05、B=0.02。据此核对该样本的波动大小，不证明未来更稳定、显著性或已排除偶然性；未独立验证运行记录来源。"
+        ],
+        "extracted_facts": 2,
+        "rule_findings": [
+          {
+            "rule_id": "dm_baseline",
+            "level": "insufficient",
+            "title": "主张包含比较关系,但材料中未发现基线/对比方法的运行记录"
+          },
+          {
+            "rule_id": "numeric_stability",
+            "level": "contradiction",
+            "title": "提供的数值不支持该限定比较主张"
+          }
+        ],
+        "latency_ms": 9.055300033651292,
+        "correct": true
+      },
+      {
+        "case_id": "T07",
+        "project_id": "synthetic-T07",
+        "domain": "data_model",
+        "aspect": "stability",
+        "gold": "insufficient",
+        "prediction": "insufficient",
+        "rationale": "重复次数是计划，尚无观测结果",
+        "citations": 7,
+        "valid_citations": 7,
+        "missing_target_subclaim": false,
+        "conflicting_edges": false,
+        "edge_bases": [
+          "重复次数、种子或单项波动仅为线索；需明确双方同条件样本标准差和有限运行范围，才能作样本内比较。 此项来自计划，尚非执行结果。",
+          "重复次数、种子或单项波动仅为线索；需明确双方同条件样本标准差和有限运行范围，才能作样本内比较。 此项来自计划，尚非执行结果。"
+        ],
+        "extracted_facts": 4,
+        "rule_findings": [
+          {
+            "rule_id": "dm_repetition",
+            "level": "insufficient",
+            "title": "主张“更稳定”,但未提供任何重复运行或随机种子信息"
+          },
+          {
+            "rule_id": "dm_baseline",
+            "level": "risk",
+            "title": "已有基线计划或补充说明，尚缺独立执行材料"
+          },
+          {
+            "rule_id": "dm_metric",
+            "level": "insufficient",
+            "title": "未发现任何评价指标,无法评估结论是否被实验支持"
+          }
+        ],
+        "latency_ms": 10.315400024410337,
+        "correct": true
+      },
+      {
+        "case_id": "T08",
+        "project_id": "synthetic-T08",
+        "domain": "algorithm_system",
+        "aspect": "stability",
+        "gold": "insufficient",
+        "prediction": "insufficient",
+        "rationale": "随机种子不含任何观测波动结果",
+        "citations": 6,
+        "valid_citations": 6,
+        "missing_target_subclaim": false,
+        "conflicting_edges": false,
+        "edge_bases": [
+          "重复次数、种子或单项波动仅为线索；需明确双方同条件样本标准差和有限运行范围，才能作样本内比较。",
+          "重复次数、种子或单项波动仅为线索；需明确双方同条件样本标准差和有限运行范围，才能作样本内比较。"
+        ],
+        "extracted_facts": 2,
+        "rule_findings": [
+          {
+            "rule_id": "as_baseline_check",
+            "level": "insufficient",
+            "title": "主张涉及算法/系统对比,但未提供基线方法信息"
+          },
+          {
+            "rule_id": "as_metric_check",
+            "level": "insufficient",
+            "title": "主张涉及性能比较,但未提供任何评价指标数据"
+          },
+          {
+            "rule_id": "as_stability_repetition",
+            "level": "risk",
+            "title": "主张涉及稳定性,但只找到单次运行的随机种子,无多次运行证据"
+          },
+          {
+            "rule_id": "as_plan_exec_coverage",
+            "level": "insufficient",
+            "title": "缺少计划或执行材料,无法进行对照审查"
+          }
+        ],
+        "latency_ms": 7.706899952609092,
+        "correct": true
+      }
+    ],
+    "warning": "公开合成开发探针；全部事实由脚本确认。不能解释为真实科研准确率、端到端模型效果或学生学习效果。"
+  },
+  "sanity_control": {
+    "condition": "all_insufficient_sanity_control_NOT_A_MODEL",
+    "run_id": "sanity-r1",
+    "dataset_sha256": "79fdf95c0504aa06b90b4c2d0db6f9f5d45ff995d049dd4247e3ff0582b073c2",
+    "summary": {
+      "n_cases": 24,
+      "label_counts": {
+        "supported": 9,
+        "contradicted": 9,
+        "insufficient": 6
+      },
+      "confusion_matrix": {
+        "supported": {
+          "supported": 0,
+          "contradicted": 0,
+          "insufficient": 9,
+          "error": 0
+        },
+        "contradicted": {
+          "supported": 0,
+          "contradicted": 0,
+          "insufficient": 9,
+          "error": 0
+        },
+        "insufficient": {
+          "supported": 0,
+          "contradicted": 0,
+          "insufficient": 6,
+          "error": 0
+        }
+      },
+      "per_class": {
+        "supported": {
+          "tp": 0,
+          "fp": 0,
+          "fn": 9,
+          "precision": null,
+          "recall": 0.0,
+          "f1": 0.0,
+          "support": 9
+        },
+        "contradicted": {
+          "tp": 0,
+          "fp": 0,
+          "fn": 9,
+          "precision": null,
+          "recall": 0.0,
+          "f1": 0.0,
+          "support": 9
+        },
+        "insufficient": {
+          "tp": 6,
+          "fp": 18,
+          "fn": 0,
+          "precision": 0.25,
+          "recall": 1.0,
+          "f1": 0.4,
+          "support": 6
+        }
+      },
+      "accuracy": 0.25,
+      "macro_f1": 0.13333333333333333,
+      "decidable_cases": 18,
+      "conclusive_cases": 0,
+      "decision_coverage": 0.0,
+      "abstention_on_decidable": 1.0,
+      "selective_accuracy": null,
+      "false_conclusive_count": 0,
+      "false_conclusive_rate": null,
+      "insufficient_recognition": 1.0,
+      "execution_error_count": 0,
+      "citations": 0,
+      "valid_citations": 0,
+      "anchor_validity": null,
+      "unit_accuracy_wilson95": null
+    },
+    "cases": [
+      {
+        "case_id": "S01",
+        "gold": "supported",
+        "prediction": "insufficient"
+      },
+      {
+        "case_id": "S02",
+        "gold": "supported",
+        "prediction": "insufficient"
+      },
+      {
+        "case_id": "S03",
+        "gold": "supported",
+        "prediction": "insufficient"
+      },
+      {
+        "case_id": "S04",
+        "gold": "contradicted",
+        "prediction": "insufficient"
+      },
+      {
+        "case_id": "S05",
+        "gold": "contradicted",
+        "prediction": "insufficient"
+      },
+      {
+        "case_id": "S06",
+        "gold": "contradicted",
+        "prediction": "insufficient"
+      },
+      {
+        "case_id": "S07",
+        "gold": "insufficient",
+        "prediction": "insufficient"
+      },
+      {
+        "case_id": "S08",
+        "gold": "insufficient",
+        "prediction": "insufficient"
+      },
+      {
+        "case_id": "C01",
+        "gold": "supported",
+        "prediction": "insufficient"
+      },
+      {
+        "case_id": "C02",
+        "gold": "supported",
+        "prediction": "insufficient"
+      },
+      {
+        "case_id": "C03",
+        "gold": "supported",
+        "prediction": "insufficient"
+      },
+      {
+        "case_id": "C04",
+        "gold": "contradicted",
+        "prediction": "insufficient"
+      },
+      {
+        "case_id": "C05",
+        "gold": "contradicted",
+        "prediction": "insufficient"
+      },
+      {
+        "case_id": "C06",
+        "gold": "contradicted",
+        "prediction": "insufficient"
+      },
+      {
+        "case_id": "C07",
+        "gold": "insufficient",
+        "prediction": "insufficient"
+      },
+      {
+        "case_id": "C08",
+        "gold": "insufficient",
+        "prediction": "insufficient"
+      },
+      {
+        "case_id": "T01",
+        "gold": "supported",
+        "prediction": "insufficient"
+      },
+      {
+        "case_id": "T02",
+        "gold": "supported",
+        "prediction": "insufficient"
+      },
+      {
+        "case_id": "T03",
+        "gold": "supported",
+        "prediction": "insufficient"
+      },
+      {
+        "case_id": "T04",
+        "gold": "contradicted",
+        "prediction": "insufficient"
+      },
+      {
+        "case_id": "T05",
+        "gold": "contradicted",
+        "prediction": "insufficient"
+      },
+      {
+        "case_id": "T06",
+        "gold": "contradicted",
+        "prediction": "insufficient"
+      },
+      {
+        "case_id": "T07",
+        "gold": "insufficient",
+        "prediction": "insufficient"
+      },
+      {
+        "case_id": "T08",
+        "gold": "insufficient",
+        "prediction": "insufficient"
+      }
+    ],
+    "missing_predictions": [],
+    "warning": "先保留模型原始输出，再由盲评者归一化标签；格式错误与超时不可从分母删除。"
+  },
+  "known_defect_audit": {
+    "total": 5,
+    "passed": 5,
+    "failed": 0,
+    "errors": 0,
+    "skipped": 0,
+    "xfailed": 0,
+    "known_defects": []
+  },
+  "release_gate": {
+    "passed": true,
+    "blockers": [],
+    "scope": "local_regression_only_not_real_world_or_learning_validation"
+  },
+  "browser": {
+    "stats": {
+      "startTime": "2026-11-02T14:14:06.478Z",
+      "duration": 18262.628,
+      "expected": 12,
+      "skipped": 0,
+      "unexpected": 0,
+      "flaky": 0
+    },
+    "cases": [
+      {
+        "title": "create, upload, confirm, answer, revise, practice and refresh",
+        "project": "desktop",
+        "status": "passed",
+        "duration_ms": 2208,
+        "annotations": [
+          {
+            "type": "browser_version",
+            "description": "156.0.8078.79"
+          }
+        ],
+        "errors": []
+      },
+      {
+        "title": "invalid persisted step recovers to a usable page",
+        "project": "desktop",
+        "status": "passed",
+        "duration_ms": 432,
+        "annotations": [
+          {
+            "type": "browser_version",
+            "description": "156.0.8078.79"
+          }
+        ],
+        "errors": []
+      },
+      {
+        "title": "upload failure keeps existing materials and retry remains usable",
+        "project": "desktop",
+        "status": "passed",
+        "duration_ms": 817,
+        "annotations": [
+          {
+            "type": "browser_version",
+            "description": "156.0.8078.79"
+          }
+        ],
+        "errors": []
+      },
+      {
+        "title": "program results remain visible and rejected model output has no repair actions",
+        "project": "desktop",
+        "status": "passed",
+        "duration_ms": 1077,
+        "annotations": [
+          {
+            "type": "browser_version",
+            "description": "156.0.8078.79"
+          }
+        ],
+        "errors": []
+      },
+      {
+        "title": "create, upload, confirm, answer, revise, practice and refresh",
+        "project": "mobile",
+        "status": "passed",
+        "duration_ms": 1998,
+        "annotations": [
+          {
+            "type": "browser_version",
+            "description": "156.0.8078.79"
+          }
+        ],
+        "errors": []
+      },
+      {
+        "title": "invalid persisted step recovers to a usable page",
+        "project": "mobile",
+        "status": "passed",
+        "duration_ms": 381,
+        "annotations": [
+          {
+            "type": "browser_version",
+            "description": "156.0.8078.79"
+          }
+        ],
+        "errors": []
+      },
+      {
+        "title": "upload failure keeps existing materials and retry remains usable",
+        "project": "mobile",
+        "status": "passed",
+        "duration_ms": 788,
+        "annotations": [
+          {
+            "type": "browser_version",
+            "description": "156.0.8078.79"
+          }
+        ],
+        "errors": []
+      },
+      {
+        "title": "program results remain visible and rejected model output has no repair actions",
+        "project": "mobile",
+        "status": "passed",
+        "duration_ms": 980,
+        "annotations": [
+          {
+            "type": "browser_version",
+            "description": "156.0.8078.79"
+          }
+        ],
+        "errors": []
+      },
+      {
+        "title": "create, upload, confirm, answer, revise, practice and refresh",
+        "project": "tablet",
+        "status": "passed",
+        "duration_ms": 2101,
+        "annotations": [
+          {
+            "type": "browser_version",
+            "description": "156.0.8078.79"
+          }
+        ],
+        "errors": []
+      },
+      {
+        "title": "invalid persisted step recovers to a usable page",
+        "project": "tablet",
+        "status": "passed",
+        "duration_ms": 476,
+        "annotations": [
+          {
+            "type": "browser_version",
+            "description": "156.0.8078.79"
+          }
+        ],
+        "errors": []
+      },
+      {
+        "title": "upload failure keeps existing materials and retry remains usable",
+        "project": "tablet",
+        "status": "passed",
+        "duration_ms": 761,
+        "annotations": [
+          {
+            "type": "browser_version",
+            "description": "156.0.8078.79"
+          }
+        ],
+        "errors": []
+      },
+      {
+        "title": "program results remain visible and rejected model output has no repair actions",
+        "project": "tablet",
+        "status": "passed",
+        "duration_ms": 1065,
+        "annotations": [
+          {
+            "type": "browser_version",
+            "description": "156.0.8078.79"
+          }
+        ],
+        "errors": []
+      }
+    ],
+    "projects": [
+      {
+        "name": "desktop",
+        "viewport": "1440x1000"
+      },
+      {
+        "name": "mobile",
+        "viewport": "390x844"
+      },
+      {
+        "name": "tablet",
+        "viewport": "768x1024"
+      }
+    ]
+  },
+  "package_versions": {
+    "pytest": "9.2.0",
+    "fastapi": "0.115.0",
+    "pydantic": "2.9.2",
+    "httpx": "0.28.1",
+    "starlette": "0.38.6",
+    "anyio": "4.15.1"
+  }
+}

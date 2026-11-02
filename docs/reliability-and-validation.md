@@ -44,6 +44,8 @@ DOCX 正文/表格与 XLSX 单元格现有只读解析。公式不执行、不�
 
 ## 练习反馈的限制
 
+深度复核的新证据编号协议、计算结果和修改验证见[使用说明](grounded-review.md)；[真实回放](../evaluation/reports/grounded-case-replay-2026-11-02/summary.md)保留两次实现修订和12次真实请求。无效输出不再继续展示修改操作；完整记录检查通过仍不能证明整个研究或语义推断正确。
+
 - 无有效模型评分时，各维分数与总分返回 `null`，`score_status=feedback_only`；前端不显示通过、未通过或已掌握。
 - 模型各维分数必须为有限的 0–1 数值，不能用字符串、布尔值、NaN、越界值凑成分数。
 - `model_feedback` 仅表示模型返回了格式有效的参考评价；不意味着内容已由教师核验。
@@ -62,7 +64,7 @@ DOCX 正文/表格与 XLSX 单元格现有只读解析。公式不执行、不�
 
 ## 如何验证
 
-`backend/tests/test_reliability_workflow.py` 覆盖弱证据、实体列表正反例、回答确认、异常模型分数、访问隔离、额度和溯源。`backend/system_tests/` 补充完整流程、故障与本轮缺陷相邻正反例。测试关闭真实模型调用；三种宽度的 Playwright 流程使用临时本机后端，验证实际页面操作与刷新恢复。完整结果见[最新报告](../evaluation/reports/2026-11-02-fixed/summary.md)。
+`backend/tests/test_reliability_workflow.py` 覆盖弱证据、确认、评分、隔离与溯源。`backend/system_tests/test_grounded_review.py` 补充证据绑定、长记录计算、零分母、修改验证和运行中材料变化。离线测试关闭模型；三种宽度的Playwright使用本机临时后端。最新为[196项测试与12项浏览器通过](../evaluation/reports/2026-11-02-grounded/summary.md)，真实模型回放单独报告。
 
 这些是开发者编写的合成回归案例，**不能据此报告真实科研材料上的准确率，也不能据此证明教学效果**。
 

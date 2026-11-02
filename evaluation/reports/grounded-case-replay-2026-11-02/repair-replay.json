@@ -1,0 +1,188 @@
+{
+  "source": "Actual split IDs from the prior real-data runs; no further provider calls or model training",
+  "dataset_sha256": "f6d9e39f37dc45d327f6db33428ee58970ccceabb2535a5c179de35886b70443",
+  "provider_calls": 0,
+  "cases": [
+    {
+      "condition": "half_repeats",
+      "expected": "still_fails",
+      "result": {
+        "kind": "entity_isolation",
+        "title": "训练与测试实体编号交集",
+        "status": "still_fails",
+        "before_check_id": "check_bf1e30c7a04e0323",
+        "after_check_id": "check_396eaaac2f4af7a4",
+        "before_values": {
+          "train_entities": 1792,
+          "test_entities": 1240,
+          "overlap_count": 1235,
+          "overlap_examples": [
+            "0",
+            "10",
+            "1000",
+            "1001",
+            "1003",
+            "1004",
+            "1006",
+            "101",
+            "1010",
+            "1013"
+          ]
+        },
+        "after_values": {
+          "train_entities": 1691,
+          "test_entities": 793,
+          "overlap_count": 687,
+          "overlap_examples": [
+            "1",
+            "100",
+            "1002",
+            "1003",
+            "1004",
+            "1008",
+            "1009",
+            "1012",
+            "1013",
+            "1014"
+          ]
+        },
+        "detail": "新记录仍未通过同一检查：完整读取所提供的两份编号列表：训练1691个、测试793个，交集687个。存在同源实体，当前记录未通过隔离检查。"
+      },
+      "scope_annotation": "none; original records unchanged"
+    },
+    {
+      "condition": "grouped_without_scope",
+      "expected": "scope_unconfirmed",
+      "result": {
+        "kind": "entity_isolation",
+        "title": "训练与测试实体编号交集",
+        "status": "scope_unconfirmed",
+        "before_check_id": "check_bf1e30c7a04e0323",
+        "after_check_id": "check_8e46ba792fd03280",
+        "before_values": {
+          "train_entities": 1792,
+          "test_entities": 1240,
+          "overlap_count": 1235,
+          "overlap_examples": [
+            "0",
+            "10",
+            "1000",
+            "1001",
+            "1003",
+            "1004",
+            "1006",
+            "101",
+            "1010",
+            "1013"
+          ]
+        },
+        "after_values": {
+          "train_entities": 1347,
+          "test_entities": 450,
+          "overlap_count": 0,
+          "overlap_examples": []
+        },
+        "detail": "当前记录通过此项检查，但前后缺少一致的evaluation_scope声明，尚不能确认是原实验的修复。"
+      },
+      "scope_annotation": "none; original records unchanged"
+    },
+    {
+      "condition": "deleted_records",
+      "result": {
+        "kind": "entity_isolation",
+        "title": "训练与测试实体编号交集",
+        "status": "not_verified",
+        "before_check_id": "check_bf1e30c7a04e0323",
+        "after_check_id": "",
+        "before_values": {
+          "train_entities": 1792,
+          "test_entities": 1240,
+          "overlap_count": 1235,
+          "overlap_examples": [
+            "0",
+            "10",
+            "1000",
+            "1001",
+            "1003",
+            "1004",
+            "1006",
+            "101",
+            "1010",
+            "1013"
+          ]
+        },
+        "after_values": {},
+        "detail": "缺少唯一、已确认的对应新记录；不能把删除材料或口头说明当作修复。"
+      }
+    },
+    {
+      "condition": "grouped_with_declared_same_scope",
+      "result": {
+        "kind": "entity_isolation",
+        "title": "训练与测试实体编号交集",
+        "status": "passed_on_records",
+        "before_check_id": "check_3375b3c2eaf55ad4",
+        "after_check_id": "check_7dd62eb43ae6c476",
+        "before_values": {
+          "train_entities": 1792,
+          "test_entities": 1240,
+          "overlap_count": 1235,
+          "overlap_examples": [
+            "0",
+            "10",
+            "1000",
+            "1001",
+            "1003",
+            "1004",
+            "1006",
+            "101",
+            "1010",
+            "1013"
+          ]
+        },
+        "after_values": {
+          "train_entities": 1347,
+          "test_entities": 450,
+          "overlap_count": 0,
+          "overlap_examples": []
+        },
+        "detail": "同一声明范围的新记录通过此项检查；未独立验证范围声明、实际训练过程与其他风险。"
+      },
+      "scope_annotation": "added by developer for this replay; not externally verified provenance"
+    },
+    {
+      "condition": "changed_scope",
+      "result": {
+        "kind": "entity_isolation",
+        "title": "训练与测试实体编号交集",
+        "status": "not_verified",
+        "before_check_id": "check_3375b3c2eaf55ad4",
+        "after_check_id": "check_da852d8f751d8cff",
+        "before_values": {
+          "train_entities": 1792,
+          "test_entities": 1240,
+          "overlap_count": 1235,
+          "overlap_examples": [
+            "0",
+            "10",
+            "1000",
+            "1001",
+            "1003",
+            "1004",
+            "1006",
+            "101",
+            "1010",
+            "1013"
+          ]
+        },
+        "after_values": {
+          "train_entities": 1347,
+          "test_entities": 450,
+          "overlap_count": 0,
+          "overlap_examples": []
+        },
+        "detail": "前后声明的实验范围不同，不能用新实验替代原问题的验证。"
+      }
+    }
+  ]
+}

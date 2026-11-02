@@ -1,6 +1,6 @@
 # 可重复的系统测试与评测工具
 
-该目录提供离线执行工具和公开合成开发集。完整方案见[评测协议](../docs/evaluation/plan.md)，当前见[修复后报告](reports/2026-11-02-fixed/summary.md)，[历史基线](reports/2026-11-02/summary.md)保留修复前结果。
+该目录提供离线工具和公开合成开发集。当前见[196项测试与12项浏览器回归](reports/2026-11-02-grounded/summary.md)、[真实模型回放](reports/grounded-case-replay-2026-11-02/summary.md)；历史基线和第一次修复报告保持原样。
 
 ## 安装与执行
 
@@ -28,7 +28,7 @@ python -m evaluation.run --release-gate
 python -m evaluation.run --release-gate --browser
 ```
 
-安装开发依赖后，Windows 自动寻找本机 Chrome/Edge；也可设置 `YANZHENG_TEST_BROWSER` 为浏览器可执行文件。其他环境可在 frontend 目录运行 `npx playwright install chromium` 安装测试浏览器。测试用独立上下文和本机临时后端，三种宽度共9项用例，不使用个人浏览器配置。原始截图、追踪和浏览器报告默认忽略，发布时只保留无敏感材料的摘要。
+安装开发依赖后，Windows 自动寻找本机 Chrome/Edge；也可设置 `YANZHENG_TEST_BROWSER` 为浏览器可执行文件。其他环境可在 frontend 目录运行 `npx playwright install chromium`。测试用独立上下文与临时后端，三种宽度共12项；其中待核实区界面用例模拟复核响应，后端拒绝机制另有系统测试。原始截图、追踪默认忽略，发布无敏感材料的摘要。
 
 如果已验证前端构建，只想复跑后端与能力诊断：
 
@@ -39,6 +39,8 @@ python -m evaluation.run --skip-frontend
 Windows 下 TestClient 需要初始化本地事件循环；若运行环境限制本地连接，需在允许本机测试连接的环境执行。不要把环境初始化失败标成产品通过。
 
 ## 合成集的边界
+
+`real_case_pilot.py`是显式选择`--live`才调用供应商的真实材料工具，与默认离线运行器分开。它要求事先准备输入、协议与源码指纹，已有结果禁止覆盖。本地原始材料和请求保存在被忽略的runs目录；公开报告保留两次实现修订、所有失败和人工复核，不把已见材料当留出集。具体边界见各自协议与[最新回放](reports/grounded-case-replay-2026-11-02/summary.md)。
 
 `cases.json` 包含24个开发者预设标签的能力探针，不是教师独立标注的留出集。运行器测试的是“规则提取 → 脚本确认事实 → 规则审查 → 证据图”的流程，**不包含真实模型、真实用户确认或界面交互**。实体隔离仅核对提供的编号；比较和稳定性案例只要求对限定表中数值作描述，不要求证明总体显著性。
 

@@ -27,9 +27,11 @@ def test_partial_coverage_is_reported_and_quote_is_bound_to_file(client, monkeyp
     sid = make_session(client)
     upload_text(client, sid, "可核对的首段原文。" + "后文" * 2000, "large.txt")
     monkeypatch.setattr(llm_client, "is_available", lambda: True)
+    from app.services.review_context import build_context
+    eid = build_context(data_store.require(sid)).evidence[0].evidence_id
     monkeypatch.setattr(llm_client, "chat", lambda *args, **kwargs: json.dumps({"deep_findings": [{
-        "title": "待检查", "level": "risk", "quote": "可核对的首段原文",
-        "material_filename": "large.txt", "reasoning": "需要核实", "suggestion": "补充说明",
+        "title": "待检查", "level": "risk", "issue_kind": "other", "evidence_ids": [eid],
+        "reasoning": "需要核实", "suggestion_action": "补充说明",
     }]}, ensure_ascii=False))
     result = client.post(f"/api/sessions/{sid}/agent/deep-review").json()
     assert result["coverage"][0]["truncated"]

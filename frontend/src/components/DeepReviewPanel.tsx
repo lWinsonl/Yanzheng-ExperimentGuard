@@ -13,7 +13,7 @@ interface Props {
 /** 状态 → 展示文案与样式类 */
 const STATUS_DISPLAY: Record<DeepReviewStatus, { text: string; cls: string }> = {
   ok: { text: '', cls: '' },
-  ok_no_findings: { text: '模型已完成复核,未发现需要补充的问题。', cls: 'success' },
+  ok_no_findings: { text: '本次模型未补充新发现。已有程序问题仍需处理。', cls: 'muted' },
   llm_unavailable: {
     text: '未接入模型,此功能需要配置 LLM 密钥(当前运行在启发式模式)。',
     cls: 'warn',
@@ -26,6 +26,10 @@ const STATUS_DISPLAY: Record<DeepReviewStatus, { text: string; cls: string }> = 
     text: '模型返回了内容但无法解析为结构化结果,本次复核未完成,请重试。',
     cls: 'error',
   },
+  needs_evidence: {
+    text: '模型输出没有通过本轮证据校验，未采用其中的修改操作。请先查看程序结果和待核实项。',
+    cls: 'warn',
+  },
 }
 
 /** 覆盖范围面板:告知用户模型实际检查了哪些材料、哪些内容因过长被截断 */
@@ -35,7 +39,7 @@ function CoveragePanel({ coverage }: { coverage: MaterialCoverage[] }) {
   return (
     <div className={`coverage-panel${hasTruncated ? ' has-truncated' : ''}`}>
       <div className="coverage-title">
-        复核范围{hasTruncated ? '(部分材料因过长被截断,未检查部分不会计入结论)' : ''}
+        提供给模型的范围{hasTruncated ? '(只提供选中内容，其余未供模型阅读)' : ''}
       </div>
       {coverage.map((c) => (
         <div key={c.material_id} className={`coverage-item${c.truncated ? ' truncated' : ''}`}>
@@ -47,10 +51,10 @@ function CoveragePanel({ coverage }: { coverage: MaterialCoverage[] }) {
             <span className="coverage-note warn">未检查(超出总量限制)</span>
           ) : c.truncated ? (
             <span className="coverage-note warn">
-              检查了前 {c.checked_chars} / {c.total_chars} 字符,其余未检查
+              {c.selection_mode === 'selected_evidence' ? '提供了选中片段' : '提供了前段'} {c.checked_chars} / {c.total_chars} 字符
             </span>
           ) : (
-            <span className="coverage-note ok">已全量检查({c.total_chars} 字符)</span>
+            <span className="coverage-note ok">已提供全文({c.total_chars} 字符)</span>
           )}
         </div>
       ))}
@@ -88,7 +92,7 @@ export function DeepReviewPanel({ sessionId, onResultChange }: Props) {
   return (
     <div className="deep-review-panel">
       <div className="agent-section-header">
-        <span>模型复核(详细修改建议)</span>
+        <span>模型复核与待验证建议</span>
         <button disabled={busy} onClick={run}>
           {busy ? '复核中…' : result ? '重新复核' : '运行模型复核'}
         </button>
@@ -103,6 +107,11 @@ export function DeepReviewPanel({ sessionId, onResultChange }: Props) {
       {result && !busy && result.coverage.length > 0 && (
         <CoveragePanel coverage={result.coverage} />
       )}
+      {result && !busy && <p className="muted">{result.validation_note || '引用存在不代表推断正确；建议需用新记录验证。'}</p>}
+      {!!result?.unverified?.length && !busy && <section className="warn" aria-label="未采纳的模型输出">
+        <strong>这些输出未采纳修改操作</strong>
+        {result.unverified.map((f, i) => <p key={i}>{f.title}：{f.reason}</p>)}
+      </section>}
       {findings.map((f, i) => (
         <div
           key={i}
@@ -117,9 +126,9 @@ export function DeepReviewPanel({ sessionId, onResultChange }: Props) {
               {LEVEL_LABELS[f.level] ?? f.level}
             </span>
             <span className="finding-title">{f.title}</span>
-            {f.quote_verified && (
-              <span className="verify-badge" title="引用已逐字校验">
-                ✓ 引用已校验
+            {f.evidence_verified && (
+              <span className="verify-badge" title="来源由服务器按本轮证据编号绑定；推理仍需核对">
+                ✓ 证据来源已绑定
               </span>
             )}
           </div>
@@ -129,7 +138,13 @@ export function DeepReviewPanel({ sessionId, onResultChange }: Props) {
               <div className="finding-reasoning">{f.reasoning}</div>
             </div>
           )}
-          {f.verified_quote && (
+          {f.evidence?.length ? <div className="finding-section">
+            <div className="section-label">依据</div>
+            {f.evidence.map(e => <details key={e.evidence_id}>
+              <summary>{e.source_kind === 'program_result' ? '程序计算' : '原文片段'} · {e.filename}</summary>
+              <pre className="span-snippet">{e.text}</pre>
+            </details>)}
+          </div> : f.verified_quote && (
             <div className="finding-section">
               <div className="section-label">原文引用</div>
               <div className="span-snippet-box">
@@ -143,7 +158,7 @@ export function DeepReviewPanel({ sessionId, onResultChange }: Props) {
           {f.suggestion && (
             <div className="finding-section">
               <div className="section-label">
-                修改建议
+                待验证的建议
                 <span
                   className={`suggestion-type-badge st-${f.suggestion_type}`}
                   title={
@@ -162,6 +177,11 @@ export function DeepReviewPanel({ sessionId, onResultChange }: Props) {
                 </span>
               </div>
               <div className="finding-suggestion">
+                <p className="muted">{f.validation_status === 'manual_verification_required'
+                  ? '此建议暂无对应的程序验证项，须人工复核依据和修改后果。'
+                  : '尚未执行验证。修改后请上传实际记录，再到第五步核对原问题。'}</p>
+                {!!f.validation_check_ids?.length && <p className="muted">修改后重查：{(result?.checks ?? [])
+                  .filter(c => f.validation_check_ids?.includes(c.check_id)).map(c => c.title).join('、')}</p>}
                 {f.suggestion_action ? (
                   <>
                     <div className="suggestion-line">

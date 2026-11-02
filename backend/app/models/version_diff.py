@@ -153,6 +153,7 @@ class VersionDiffResult(BaseModel):
 
     revision_alignment: RevisionAlignment = Field(default_factory=RevisionAlignment)
     created_at: str = ""
+    repair_checks: list[dict] = Field(default_factory=list)
 
 
 class MigrationQuestion(BaseModel):

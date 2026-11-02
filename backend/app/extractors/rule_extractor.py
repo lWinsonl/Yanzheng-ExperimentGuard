@@ -90,6 +90,13 @@ class RuleExtractor(ExtractorBase):
         from app.models.evidence import SourceSpan
         from app.services.evidence_checks import entity_sets
         from app.services.numeric_evidence import parsed_records
+        from app.services.program_checks import parse_confusion_table
+
+        if parse_confusion_table(doc.content) is not None:
+            yield self.make_fact(session_id=session_id, category=FactCategory.METRIC,
+                value=doc.content.strip(), source=SourceSpan(material_id=doc.material_id,
+                    start_char=0, end_char=len(doc.content), snippet=doc.content),
+                note="完整二分类混淆矩阵：Observed为真实标签，列为预测标签，正类为1；确认方向与编码后再核对。")
 
         kinds = {kind for kind, _ in parsed_records(doc.content)}
         for kind in sorted(kinds):

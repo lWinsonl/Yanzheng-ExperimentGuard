@@ -14,6 +14,7 @@ import { DeepReviewPanel } from '../components/DeepReviewPanel'
 import { ClaimGraphPanel } from '../components/ClaimGraphPanel'
 import { FollowupPanel } from '../components/FollowupWorkflow'
 import { LoadingDots } from '../components/LoadingDots'
+import { ProgramChecksPanel } from '../components/ProgramChecksPanel'
 
 interface Props {
   sessionId: string
@@ -36,6 +37,7 @@ export function ReportPage({ sessionId, title, claimTexts, onNext, onBack }: Pro
   async function run() {
     setBusy(true)
     setError('')
+    setDeepResult(null)
     try {
       setReport(await runReview(sessionId))
     } catch (e) {
@@ -49,6 +51,7 @@ export function ReportPage({ sessionId, title, claimTexts, onNext, onBack }: Pro
   async function refreshReport() {
     try {
       setReport(await getLatestReport(sessionId))
+      setDeepResult(null)
     } catch {
       /* 保持旧报告 */
     }
@@ -84,10 +87,11 @@ export function ReportPage({ sessionId, title, claimTexts, onNext, onBack }: Pro
       lines.push('## 模型复核(详细修改建议)')
       const statusLabel: Record<DeepReviewStatus, string> = {
         ok: '调用成功',
-        ok_no_findings: '调用成功,未发现需要补充的问题',
+        ok_no_findings: '模型未补充新发现，已有程序问题仍需处理',
         llm_unavailable: '未接入模型,复核未执行',
         llm_call_failed: '模型调用失败,复核未完成',
         llm_parse_failed: '模型输出解析失败,复核未完成',
+        needs_evidence: '模型输出未通过证据校验，修改操作未采用',
       }
       lines.push(`- **状态**:${statusLabel[deepResult.status] ?? deepResult.status}`)
       if (deepResult.message) lines.push(`- **说明**:${deepResult.message}`)
@@ -97,7 +101,7 @@ export function ReportPage({ sessionId, title, claimTexts, onNext, onBack }: Pro
           if (c.checked_chars === 0) {
             lines.push(`  - ${c.filename}:未检查(超出总量限制,共 ${c.total_chars} 字符)`)
           } else if (c.truncated) {
-            lines.push(`  - ${c.filename}:检查了前 ${c.checked_chars}/${c.total_chars} 字符,其余未检查`)
+            lines.push(`  - ${c.filename}:提供了${c.selection_mode === 'selected_evidence' ? '选中片段' : '前段'} ${c.checked_chars}/${c.total_chars} 字符,其余未检查`)
           } else {
             lines.push(`  - ${c.filename}:已全量检查(${c.total_chars} 字符)`)
           }
@@ -112,7 +116,12 @@ export function ReportPage({ sessionId, title, claimTexts, onNext, onBack }: Pro
         if (f.verified_quote) lines.push(`- **原文引用**:"${f.verified_quote}"`)
         if (f.material_filename) lines.push(`- **来源材料**:${f.material_filename}`)
         if (f.suggestion) lines.push(`- **建议**:${f.suggestion}`)
+        lines.push('- 建议尚未执行；补充新运行记录后才能验证。')
       })
+      if (deepResult.unverified?.length) {
+        lines.push('', '### 未采纳的模型输出')
+        deepResult.unverified.forEach(f => lines.push(`- ${f.title}：${f.reason}`))
+      }
     }
     if (graph) {
       lines.push('')
@@ -141,6 +150,10 @@ export function ReportPage({ sessionId, title, claimTexts, onNext, onBack }: Pro
           }
         })
       })
+    }
+    if (report.program_checks?.length) {
+      lines.push('', '## 程序核对结果')
+      report.program_checks.forEach(c => lines.push(`- ${c.title} [${c.status}]：${c.basis} ${c.boundary}`))
     }
     for (const level of order) {
       const findings = grouped[level] ?? []
@@ -205,6 +218,7 @@ export function ReportPage({ sessionId, title, claimTexts, onNext, onBack }: Pro
             </span>
           </div>
 
+          <ProgramChecksPanel checks={report.program_checks ?? []} />
           {report.findings.length === 0 && (
             <div className="success">
               当前规则未触发发现。这不代表实验已通过全面审查，也不表示所有主张已被证实。
@@ -240,7 +254,7 @@ export function ReportPage({ sessionId, title, claimTexts, onNext, onBack }: Pro
           </details>
           <details className="workflow-details">
             <summary>需要进一步建议时，运行模型复核</summary>
-            <DeepReviewPanel sessionId={sessionId} onResultChange={setDeepResult} />
+            <DeepReviewPanel key={report.report_id} sessionId={sessionId} onResultChange={setDeepResult} />
           </details>
           <div className="workflow-next">
             <h3>准备好修改了吗？</h3>

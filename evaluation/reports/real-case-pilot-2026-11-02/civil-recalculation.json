@@ -1,0 +1,24 @@
+{
+  "source": {
+    "url": "https://raw.githubusercontent.com/andybega/Blair-Sambanis-replication/888d545636b46e43694a3a8537b97a73fac6e543/table4/data/6mo_predictions_escalation_OOS.dta",
+    "sha256": "c73361ee8e4b2094e99e9745cefce7a1e98675ba8c1a7b2b09f2f83c93a0a927",
+    "bytes": 93092
+  },
+  "matrix": {
+    "original": {
+      "TN": 132,
+      "FP": 17,
+      "FN": 2,
+      "TP": 13
+    },
+    "onset": {
+      "TN": 134,
+      "FP": 30,
+      "FN": 0,
+      "TP": 0
+    }
+  },
+  "matched_published_tables": true,
+  "published_forecast_list_used": true,
+  "training_rerun": false
+}

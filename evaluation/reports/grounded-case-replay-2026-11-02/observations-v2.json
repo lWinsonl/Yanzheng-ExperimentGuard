@@ -1,0 +1,214 @@
+{
+  "run": "grounded-case-replay-2026-11-02",
+  "model": "glm-4-flash",
+  "provider_attempts": 6,
+  "successful_http": 6,
+  "returned_models": [
+    "glm-4-flash"
+  ],
+  "usage_known": {
+    "prompt_tokens": 7805,
+    "completion_tokens": 1646,
+    "total_tokens": 9451
+  },
+  "unknown_usage_attempts": [],
+  "accepted_count": 2,
+  "unverified_count": 6,
+  "input_sha256": "e8f621da2b850829bddae5b7a703edb0aaa48bce54d7f95e2cc527fb402d83a9",
+  "cases": [
+    {
+      "case_id": "R1",
+      "status": "needs_evidence",
+      "seconds": 7.0,
+      "accepted": [],
+      "unverified": [
+        {
+          "title": "目标语义一致性",
+          "reason": "引用了本轮不存在的证据或检查编号，未采纳修改操作。"
+        }
+      ],
+      "checks": []
+    },
+    {
+      "case_id": "R2",
+      "status": "ok",
+      "seconds": 8.754,
+      "accepted": [
+        {
+          "title": "评分目标与Observed编码一致性验证",
+          "level": "risk",
+          "reasoning": "根据任务描述，评分目标是预测 civil war onset，而Observed编码应与此目标一致。",
+          "suggestion_action": "确认Observed编码确实与civil war onset目标一致，并提供相关文档或代码说明。",
+          "suggestion_verify": "检查Observed编码与目标的一致性，并验证相关文档或代码的准确性。",
+          "evidence_ids": [
+            "ev_495313647a139fd0",
+            "ev_9a88bfe06fd60962",
+            "ev_b77e6d485135475e"
+          ],
+          "check_ids": [],
+          "ids_in_current_catalog": true,
+          "source_ranges_verified": true,
+          "validation_status": "not_executed"
+        }
+      ],
+      "unverified": [],
+      "checks": []
+    },
+    {
+      "case_id": "R3",
+      "status": "needs_evidence",
+      "seconds": 8.979,
+      "accepted": [],
+      "unverified": [
+        {
+          "title": "所提供表格没有实际正类，无法据此估计召回率",
+          "reason": "字段不符合证据编号协议，未采纳其推断和修改操作。"
+        }
+      ],
+      "checks": [
+        {
+          "check_id": "check_d0569ceb0bb70924",
+          "kind": "recall_defined",
+          "scope_key": "recall_defined:execution:matrix.csv:",
+          "scope_identity": "",
+          "title": "二分类召回率分母",
+          "status": "failed",
+          "basis": "按表中Observed=1为正类、行为真实值、列为预测值：TP+FN=0。正类为零，recall未定义，不能写成0、100%或用准确率代替。",
+          "values": {
+            "TN": 134,
+            "FP": 30,
+            "FN": 0,
+            "TP": 0,
+            "positive_label": 1,
+            "denominator": 0,
+            "recall": null
+          },
+          "fact_ids": [
+            "fact_b4b6e871af"
+          ],
+          "material_ids": [
+            "mat_35ce1e6dd8"
+          ],
+          "boundary": "仅核对提供的已确认记录，未独立验证记录来源、完整性或其他问题。"
+        }
+      ]
+    },
+    {
+      "case_id": "D1",
+      "status": "ok",
+      "seconds": 13.045,
+      "accepted": [
+        {
+          "title": "训练与测试实体编号存在交集",
+          "level": "risk",
+          "reasoning": "根据提供的证据，训练和测试实体的编号存在交集，违反了实体隔离的原则。",
+          "suggestion_action": "重新设计实验，确保训练和测试数据中的实体编号没有交集。",
+          "suggestion_verify": "验证新的实验设计是否避免了实体编号的交集。",
+          "evidence_ids": [
+            "ev_093c3e4fcd536bb1"
+          ],
+          "check_ids": [
+            "check_11201cbd792e75c3"
+          ],
+          "ids_in_current_catalog": true,
+          "source_ranges_verified": true,
+          "validation_status": "awaiting_new_records"
+        }
+      ],
+      "unverified": [
+        {
+          "title": "训练与测试原始图片编号无交集的主张与实际结果冲突",
+          "reason": "该检查与模型所声称的问题类型不对应。"
+        }
+      ],
+      "checks": [
+        {
+          "check_id": "check_11201cbd792e75c3",
+          "kind": "entity_isolation",
+          "scope_key": "entity_isolation:execution:entities.json:",
+          "scope_identity": "",
+          "title": "训练与测试实体编号交集",
+          "status": "failed",
+          "basis": "完整读取所提供的两份编号列表：训练1792个、测试1240个，交集1235个。存在同源实体，当前记录未通过隔离检查。",
+          "values": {
+            "train_entities": 1792,
+            "test_entities": 1240,
+            "overlap_count": 1235,
+            "overlap_examples": [
+              "0",
+              "10",
+              "1000",
+              "1001",
+              "1003",
+              "1004",
+              "1006",
+              "101",
+              "1010",
+              "1013"
+            ]
+          },
+          "fact_ids": [
+            "fact_229ffd578f"
+          ],
+          "material_ids": [
+            "mat_07248e83a4"
+          ],
+          "boundary": "仅核对提供的已确认记录，未独立验证记录来源、完整性或其他问题。"
+        }
+      ]
+    },
+    {
+      "case_id": "D2",
+      "status": "needs_evidence",
+      "seconds": 13.648,
+      "accepted": [],
+      "unverified": [
+        {
+          "title": "实体编号隔离风险",
+          "reason": "程序没有确认该项失败，不能将未知或已通过的检查报告为确定问题。"
+        },
+        {
+          "title": "数据集比较风险",
+          "reason": "程序没有确认该项失败，不能将未知或已通过的检查报告为确定问题。"
+        }
+      ],
+      "checks": [
+        {
+          "check_id": "check_f66a19af37cd62eb",
+          "kind": "entity_isolation",
+          "scope_key": "entity_isolation:execution:entities.json:",
+          "scope_identity": "",
+          "title": "训练与测试实体编号交集",
+          "status": "passed",
+          "basis": "完整读取所提供的两份编号列表：训练1347个、测试450个，交集0个。这些列表未出现相同编号；不据此排除其他泄漏。",
+          "values": {
+            "train_entities": 1347,
+            "test_entities": 450,
+            "overlap_count": 0,
+            "overlap_examples": []
+          },
+          "fact_ids": [
+            "fact_6d4d782515"
+          ],
+          "material_ids": [
+            "mat_bbb2e635e9"
+          ],
+          "boundary": "仅核对提供的已确认记录，未独立验证记录来源、完整性或其他问题。"
+        }
+      ]
+    },
+    {
+      "case_id": "D3",
+      "status": "needs_evidence",
+      "seconds": 9.012,
+      "accepted": [],
+      "unverified": [
+        {
+          "title": "主张涉及未见实体泛化，但缺少数据划分信息，尚无法核实实体是否隔离",
+          "reason": "引用了本轮不存在的证据或检查编号，未采纳修改操作。"
+        }
+      ],
+      "checks": []
+    }
+  ]
+}

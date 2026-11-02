@@ -1,0 +1,67 @@
+{
+  "dataset_sha256": "f6d9e39f37dc45d327f6db33428ee58970ccceabb2535a5c179de35886b70443",
+  "rows": 1797,
+  "features": 64,
+  "runs": [
+    {
+      "seed": 41,
+      "mode": "row",
+      "accuracy": 1.0,
+      "train_rows": 5391,
+      "test_rows": 1797,
+      "train_originals": 1792,
+      "test_originals": 1240,
+      "overlap_originals": 1235
+    },
+    {
+      "seed": 41,
+      "mode": "group",
+      "accuracy": 0.9866666666666667,
+      "train_rows": 5388,
+      "test_rows": 1800,
+      "train_originals": 1347,
+      "test_originals": 450,
+      "overlap_originals": 0
+    },
+    {
+      "seed": 42,
+      "mode": "row",
+      "accuracy": 1.0,
+      "train_rows": 5391,
+      "test_rows": 1797,
+      "train_originals": 1785,
+      "test_originals": 1215,
+      "overlap_originals": 1203
+    },
+    {
+      "seed": 42,
+      "mode": "group",
+      "accuracy": 0.9822222222222222,
+      "train_rows": 5388,
+      "test_rows": 1800,
+      "train_originals": 1347,
+      "test_originals": 450,
+      "overlap_originals": 0
+    },
+    {
+      "seed": 43,
+      "mode": "row",
+      "accuracy": 1.0,
+      "train_rows": 5391,
+      "test_rows": 1797,
+      "train_originals": 1790,
+      "test_originals": 1228,
+      "overlap_originals": 1221
+    },
+    {
+      "seed": 43,
+      "mode": "group",
+      "accuracy": 0.9844444444444445,
+      "train_rows": 5388,
+      "test_rows": 1800,
+      "train_originals": 1347,
+      "test_originals": 450,
+      "overlap_originals": 0
+    }
+  ]
+}

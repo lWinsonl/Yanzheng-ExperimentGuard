@@ -11,6 +11,7 @@ from datetime import datetime
 from app.models.review import ReviewReport
 from app.rules import get_rules_for
 from app.services.store import data_store
+from app.services.program_checks import build_checks
 
 
 class ReviewService:
@@ -61,6 +62,7 @@ class ReviewService:
             snapshot_version=1,
             checked_rule_ids=checked,
             failed_rule_ids=failed,
+            program_checks=build_checks(usable, store.docs, claim_texts),
             fact_snapshot=[f.model_copy(deep=True) for f in usable],
             claim_snapshot={c.claim_id: c.text for c in session.claims},
             material_snapshot=[{"material_id": d.material_id, "role": d.role.value,

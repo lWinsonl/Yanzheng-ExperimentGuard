@@ -1,0 +1,25 @@
+﻿case_id,project_id,gold,rationale
+T01,synthetic-T01,supported,仅比较已给出的同条件样本标准差；有限样本描述不等于总体稳定性证明
+T04,synthetic-T04,contradicted,仅比较已给出的同条件样本标准差；有限样本描述不等于总体稳定性证明
+S01,synthetic-S01,supported,两侧非空编号列表无交集
+C07,synthetic-C07,insufficient,准确率和F1不是同一指标，不能直接比较
+C03,synthetic-C03,supported,同一指标与条件，按明确的指标方向比较表中点估计；不要求推断显著性
+C04,synthetic-C04,contradicted,同一指标与条件，按明确的指标方向比较表中点估计；不要求推断显著性
+S05,synthetic-S05,contradicted,本题规定整数字符串与整数代表同一实体，编号1重叠
+T02,synthetic-T02,supported,仅比较已给出的同条件样本标准差；有限样本描述不等于总体稳定性证明
+T07,synthetic-T07,insufficient,重复次数是计划，尚无观测结果
+T08,synthetic-T08,insufficient,随机种子不含任何观测波动结果
+S08,synthetic-S08,insufficient,函数可能在设备编号上调用，既不能证明重叠也不能证明无交集
+C02,synthetic-C02,supported,同一指标与条件，按明确的指标方向比较表中点估计；不要求推断显著性
+C01,synthetic-C01,supported,同一指标与条件，按明确的指标方向比较表中点估计；不要求推断显著性
+C08,synthetic-C08,insufficient,测试负载不同，数值不能归因于算法
+T06,synthetic-T06,contradicted,仅比较已给出的同条件样本标准差；有限样本描述不等于总体稳定性证明
+S07,synthetic-S07,insufficient,分组计划没有给出实际列表
+S02,synthetic-S02,supported,Unicode 编号列表无交集
+C06,synthetic-C06,contradicted,同一指标与条件，按明确的指标方向比较表中点估计；不要求推断显著性
+S04,synthetic-S04,contradicted,编号 B 同时存在于两侧
+S06,synthetic-S06,contradicted,多实体列表中的局部重叠也违反无交集主张
+T05,synthetic-T05,contradicted,仅比较已给出的同条件样本标准差；有限样本描述不等于总体稳定性证明
+C05,synthetic-C05,contradicted,同一指标与条件，按明确的指标方向比较表中点估计；不要求推断显著性
+S03,synthetic-S03,supported,整数编号列表无交集
+T03,synthetic-T03,supported,仅比较已给出的同条件样本标准差；有限样本描述不等于总体稳定性证明

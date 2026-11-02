@@ -157,11 +157,11 @@ class ClaimGeneralizationRule(RuleBase):
                 Finding(
                     rule_id=self.rule_id,
                     level=FindingLevel.INSUFFICIENT,
-                    title="主张涉及新设备泛化,但未提供数据划分信息,无法核实测试集是否为未见设备",
+                    title="主张涉及未见实体泛化,但缺少数据划分信息，尚无法核实实体是否隔离",
                     claim_ids=target_ids,
                     evidence=[],
-                    missing_evidence=["数据划分方式说明或代码", "训练集与测试集的设备编号交集记录"],
-                    suggestion="提供数据划分代码或说明,并核对训练集与测试集的设备编号是否相交。",
+                    missing_evidence=["数据划分方式说明或代码", "训练集与测试集的实体编号交集记录"],
+                    suggestion="提供划分代码与实际实体编号。实体可以是图片、设备、用户等，应与当前任务保持一致。",
                     suggestion_type="clarify",
                     reasoning="主张的泛化范围需要划分方式证据支持,目前无法核实。",
                 )
@@ -201,7 +201,7 @@ class ClaimGeneralizationRule(RuleBase):
                     claim_ids=target_ids,
                     evidence=_refs(check_facts),
                     missing_evidence=["训练集与测试集的设备编号交集记录(用于确认是否泄漏)"],
-                    suggestion="核对训练集与测试集的设备编号是否相交;若目标是预测新设备,改为按设备划分后重新评估。若无法重做,可将结论收窄为“在同一批设备上的表现”。",
+                    suggestion="核对训练集与测试集的同源实体编号是否相交；若目标是未见实体，按该实体分组后重新评估。无法重做时，说明结论仅覆盖已评估的实体范围。",
                     suggestion_type="fix",
                     reasoning="随机划分线索不能证明实际存在重叠；需核对输入单位与实体编号交集。",
                 )

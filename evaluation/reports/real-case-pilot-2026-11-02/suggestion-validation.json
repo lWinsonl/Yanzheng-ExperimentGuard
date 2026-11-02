@@ -1,0 +1,10 @@
+{
+  "analysis_type": "posthoc_exploratory_suggestion_check_not_original_gold",
+  "origin": "D1 direct_reference suggestion: reduce repetitions from4 to2 without changing row split",
+  "seed": 41,
+  "accuracy": 0.9911012235817576,
+  "overlap_originals": 687,
+  "train_rows": 2695,
+  "test_rows": 899,
+  "fixes_original_entity_overlap": false
+}

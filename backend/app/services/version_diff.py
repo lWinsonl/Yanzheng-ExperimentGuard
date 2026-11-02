@@ -31,6 +31,7 @@ from app.models.version_diff import (
 )
 from app.services.review import review_service
 from app.services.store import data_store
+from app.services.program_checks import compare_repair_checks
 
 logger = logging.getLogger("version_diff")
 
@@ -138,6 +139,8 @@ class VersionDiffService:
             new_issue_ids=new_issue_ids,
             revision_alignment=alignment,
             created_at=datetime.now().isoformat(),
+            repair_checks=[c.model_dump(mode="json") for c in compare_repair_checks(
+                old_report.program_checks, new_report.program_checks)],
         )
 
     @staticmethod

@@ -1,0 +1,26 @@
+
+> frontend@0.0.0 test:e2e
+> playwright test
+
+
+Running 12 tests using 1 worker
+
+  ok  1 [desktop] › e2e\workflow.spec.ts:7:1 › create, upload, confirm, answer, revise, practice and refresh (2.2s)
+  ok  2 [desktop] › e2e\workflow.spec.ts:65:1 › invalid persisted step recovers to a usable page (432ms)
+  ok  3 [desktop] › e2e\workflow.spec.ts:75:1 › upload failure keeps existing materials and retry remains usable (817ms)
+  ok  4 [desktop] › e2e\workflow.spec.ts:96:1 › program results remain visible and rejected model output has no repair actions (1.1s)
+  ok  5 [mobile] › e2e\workflow.spec.ts:7:1 › create, upload, confirm, answer, revise, practice and refresh (2.0s)
+  ok  6 [mobile] › e2e\workflow.spec.ts:65:1 › invalid persisted step recovers to a usable page (381ms)
+  ok  7 [mobile] › e2e\workflow.spec.ts:75:1 › upload failure keeps existing materials and retry remains usable (788ms)
+  ok  8 [mobile] › e2e\workflow.spec.ts:96:1 › program results remain visible and rejected model output has no repair actions (980ms)
+  ok  9 [tablet] › e2e\workflow.spec.ts:7:1 › create, upload, confirm, answer, revise, practice and refresh (2.1s)
+  ok 10 [tablet] › e2e\workflow.spec.ts:65:1 › invalid persisted step recovers to a usable page (476ms)
+  ok 11 [tablet] › e2e\workflow.spec.ts:75:1 › upload failure keeps existing materials and retry remains usable (761ms)
+  ok 12 [tablet] › e2e\workflow.spec.ts:96:1 › program results remain visible and rejected model output has no repair actions (1.1s)
+
+  12 passed (18.3s)
+
+[WebServer] INFO:     Started server process [1028]
+[WebServer] INFO:     Waiting for application startup.
+[WebServer] INFO:     Application startup complete.
+[WebServer] INFO:     Uvicorn running on http://127.0.0.1:18083 (Press CTRL+C to quit)

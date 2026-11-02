@@ -17,6 +17,7 @@ import {
   getVersionDiffStats,
   runVersionDiff,
 } from '../api'
+import { RepairChecksPanel } from './ProgramChecksPanel'
 
 interface Props {
   sessionId: string
@@ -137,6 +138,7 @@ export function VersionDiffPanel({ sessionId, onResultChange }: Props) {
           onChange={(e) => setRevisionNote(e.target.value)} placeholder="补充本轮实际修改的内容，再运行复查。" />
       </div>
 
+      <RepairChecksPanel checks={diff?.repair_checks ?? []} />
       {/* 修改理由对照 */}
       {diff?.revision_alignment && (
         <div className="vdiff-alignment">

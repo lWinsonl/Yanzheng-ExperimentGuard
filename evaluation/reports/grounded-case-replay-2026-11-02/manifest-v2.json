@@ -1,0 +1,38 @@
+{
+  "created_at_utc": "2026-11-02T14:07:27.956194+00:00",
+  "source_commit": "a56fad86f26581fb82aeacef638482f81999dc77",
+  "inputs_sha256": "e8f621da2b850829bddae5b7a703edb0aaa48bce54d7f95e2cc527fb402d83a9",
+  "gold_sha256": "396674109950bd67ae26829e17f7107749ffc18b4795b069918630c652b25cbd",
+  "protocol_sha256": "510b3b4aff35c739d3e6966302af6589bf5806908298b97d5b9f0ddedee6fa38",
+  "dataset_sha256": "f6d9e39f37dc45d327f6db33428ee58970ccceabb2535a5c179de35886b70443",
+  "numpy": "2.4.2",
+  "sklearn": "1.8.0",
+  "pandas": "3.0.1",
+  "python": "3.13.7",
+  "published_source": {
+    "repository": "andybega/Blair-Sambanis-replication",
+    "commit": "888d545636b46e43694a3a8537b97a73fac6e543",
+    "files": {
+      "table4/README.Rmd": "5aa9b6cb768f5a2af8167aeb45f55881fd4be0f68e9e3e7070821806f71ff796",
+      "paper/data/table4-original.csv": "194d5132ff35c2d3d869db142d94d8af0148f14ead9a1f0045bccba44aad6d5a",
+      "paper/data/table4-fixed.csv": "ed809699ebf3a7fe53319c5dbbc4159382160507be17c4a534f6d73f33eef40b",
+      "rep_original/code/6mo_make_confusion_matrix.do": "25bc72c1e8781c6a567848e3f496207bacb6a4f28a19322333c9c776115197a9"
+    }
+  },
+  "provider_attempt_cap": 6,
+  "max_output_tokens_per_request": 2500,
+  "baseline_case_ids": [],
+  "training_seeds": [
+    41,
+    42,
+    43
+  ],
+  "pre_execution_manifest_correction": {
+    "reason": "Windows newline translation: record the hash of actual input file bytes, not the pre-write string; no material or label changed and no provider was called.",
+    "previous_serialization_sha256": "106d77c24cabf65230e707821e2b3585857d880679f1deca92cebff47bd23800"
+  },
+  "protocol_file": "docs/evaluation/grounded-review-replay-protocol.md",
+  "application_sha256": "d6517c70305c51c9b079b9acfaef85462500a22550119600952fbd92a76522ea",
+  "previous_run": "real-case-pilot-2026-11-02",
+  "status": "seen_development_regression_not_holdout"
+}

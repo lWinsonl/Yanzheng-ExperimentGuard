@@ -96,6 +96,7 @@ export interface ReviewReport {
   usable_fact_count: number
   skipped_fact_count: number
   created_at: string
+  program_checks?: ProgramCheck[]
 }
 
 /** 复查对比项 */
@@ -214,6 +215,45 @@ export interface DeepFinding {
   suggestion_action?: string
   suggestion_reason?: string
   suggestion_verify?: string
+  evidence_ids?: string[]
+  evidence?: ReviewEvidence[]
+  check_ids?: string[]
+  evidence_verified?: boolean
+  validation_check_ids?: string[]
+  validation_status?: string
+}
+
+export interface ReviewEvidence {
+  evidence_id: string
+  material_id: string
+  filename: string
+  role: string
+  start_char: number
+  end_char: number
+  text: string
+  source_kind: 'uploaded_excerpt' | 'program_result'
+  check_id: string
+}
+
+export interface ProgramCheck {
+  check_id: string
+  kind: 'entity_isolation' | 'recall_defined' | 'comparison' | 'stability'
+  scope_key: string
+  scope_identity: string
+  title: string
+  status: 'passed' | 'failed' | 'unknown'
+  basis: string
+  values: Record<string, unknown>
+  boundary: string
+}
+
+export interface RepairCheck {
+  kind: string
+  title: string
+  status: 'still_fails' | 'passed_on_records' | 'scope_unconfirmed' | 'not_verified'
+  before_values: Record<string, unknown>
+  after_values: Record<string, unknown>
+  detail: string
 }
 
 /** 单份材料的复核覆盖情况 */
@@ -224,6 +264,8 @@ export interface MaterialCoverage {
   total_chars: number
   checked_chars: number
   truncated: boolean
+  selection_mode?: 'prefix' | 'selected_evidence'
+  ranges?: { start_char: number; end_char: number }[]
 }
 
 /** 模型复核状态:区分调用成功/失败/解析失败 */
@@ -233,6 +275,7 @@ export type DeepReviewStatus =
   | 'llm_unavailable'
   | 'llm_call_failed'
   | 'llm_parse_failed'
+  | 'needs_evidence'
 
 /** 模型复核完整结果(含状态、发现、覆盖范围) */
 export interface DeepReviewResult {
@@ -241,6 +284,10 @@ export interface DeepReviewResult {
   findings: DeepFinding[]
   coverage: MaterialCoverage[]
   llm_available: boolean
+  checks?: ProgramCheck[]
+  evidence_catalog?: ReviewEvidence[]
+  unverified?: { title: string; reason: string }[]
+  validation_note?: string
 }
 
 export interface TeachingCase {
@@ -511,6 +558,7 @@ export interface VersionDiffResult {
   new_issue_ids: string[]
   revision_alignment: RevisionAlignment
   created_at: string
+  repair_checks?: RepairCheck[]
 }
 
 /** 迁移题 */

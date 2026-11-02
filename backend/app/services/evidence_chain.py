@@ -173,15 +173,22 @@ class EvidenceChainService:
         for fid in fact_ids:
             del store.facts[fid]
 
-        # 数据一致性:材料已替换,旧审查报告/复查结果引用的事实已不存在,一并清除。
-        # 否则报告页点"查看原文"会 404,复查对比也会引用已删除的事实。
-        if to_remove and (store.reports or store.rechecks):
+        # 数据一致性:材料已替换,旧审查报告/复查结果/主张-证据图/追问引用的事实已不存在,一并清除。
+        # 否则报告页点"查看原文"会 404,复查对比、证据图与追问也会引用已删除的事实。
+        # 数据一致性:材料已替换,主张-证据图/追问/版本差异/迁移引用的事实已不存在,一并清除。
+        # 注意:旧审查报告与复查结果保留——版本差异复审需要历史报告做对比(P2)。
+        # 旧报告中的 evidence ref 携带冗余值与片段,前端展示不受影响;仅"查看原文"对已删材料不可用。
+        if to_remove and (store.claim_graph or store.followup_questions or store.version_diffs or store.migration_questions):
             logger.info(
-                "替换模式:同步清除会话 %s 的旧报告 %d 份、复查结果 %d 份(材料已替换,旧结论失效)",
-                session_id, len(store.reports), len(store.rechecks),
+                "替换模式:同步清除会话 %s 的主张-证据图、追问、版本差异与迁移数据(材料已替换,引用的事实已不存在;旧报告保留供版本对比)",
+                session_id,
             )
-            store.reports.clear()
-            store.rechecks.clear()
+            store.claim_graph = None
+            store.followup_questions = []
+            store.version_diffs = []
+            store.migration_questions = []
+            store.migration_answers = []
+            store.manual_labels = []
 
         if to_remove:
             logger.info("替换模式:清除会话 %s 的 %s 材料 %d 份、关联事实 %d 条",

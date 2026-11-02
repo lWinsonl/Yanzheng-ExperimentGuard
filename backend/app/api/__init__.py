@@ -1,4 +1,4 @@
-from app.api import agent, facts, materials, recheck, review, sessions
+from app.api import agent, claim_graph, facts, followup, materials, recheck, review, sessions, version_diff
 
 ALL_ROUTERS = [
     sessions.router,
@@ -7,6 +7,9 @@ ALL_ROUTERS = [
     review.router,
     recheck.router,
     agent.router,
+    claim_graph.router,
+    followup.router,
+    version_diff.router,
 ]
 
 __all__ = ["ALL_ROUTERS"]

@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field
+from datetime import datetime
 
 from app.agent import prompts
 from app.agent.llm_client import llm_client
@@ -311,6 +312,92 @@ class AgentService:
             for f in insufficient
         ]
 
+    # ---- 3b. 基于预期信息价值的主动追问(P1) ----
+
+    def generate_ranked_followups(self, session_id: str) -> dict:
+        """生成 EIV 排序的主动追问:回答哪个问题最可能改变审查结论。
+
+        流程:
+        1. 取审查报告全部发现(按严重度排序)与主张-证据图的子主张。
+        2. LLM 生成追问候选(含证据类型/格式/子主张绑定/评分因子)。
+        3. followup_service 计算可解释 EIV 评分并排序。
+        4. 保存追问列表,返回给前端展示"为何先问这个"。
+
+        Returns:
+            {status, message, questions, source}
+        """
+        from app.services.followup import followup_service
+
+        store = data_store.require(session_id)
+        report = store.latest_report()
+        if report is None or not report.findings:
+            return {"status": "no_findings", "message": "尚无审查发现,无需追问", "questions": [], "source": "none"}
+
+        # 发现按严重度排序:contradiction > risk > insufficient
+        level_order = {FindingLevel.CONTRADICTION: 0, FindingLevel.RISK: 1, FindingLevel.INSUFFICIENT: 2}
+        sorted_findings = sorted(report.findings, key=lambda f: level_order.get(f.level, 9))
+        findings_desc = "\n".join(
+            f"- ID:{f.finding_id} 级别:{f.level.value} 标题:{f.title}\n"
+            f"  缺什么:{'; '.join(f.missing_evidence) or '(无)'}\n"
+            f"  建议:{f.suggestion}"
+            for f in sorted_findings
+        )
+        claims_text = "\n".join(f"- {c.text}" for c in store.session.claims)
+
+        # 子主张列表(若有主张-证据图)
+        sub_claims_text = "(尚未构建主张-证据图)"
+        if store.claim_graph and store.claim_graph.sub_claims:
+            sub_claims_text = "\n".join(
+                f"- ID:{sc.sub_claim_id} [{sc.test_aspect.value}] {sc.text}"
+                for sc in store.claim_graph.sub_claims
+            )
+
+        raw_questions: list[dict] = []
+
+        if llm_client.is_available():
+            raw = llm_client.chat(
+                prompts.FOLLOWUP_EIV_SYSTEM,
+                prompts.FOLLOWUP_EIV_USER.format(
+                    findings=findings_desc,
+                    claims=claims_text,
+                    sub_claims=sub_claims_text,
+                ),
+                retries=1,
+            )
+            if raw:
+                data = llm_client.parse_json_response(raw)
+                if isinstance(data, dict) and isinstance(data.get("followups"), list):
+                    raw_questions = [i for i in data["followups"] if isinstance(i, dict)]
+
+        if not raw_questions:
+            # 启发式降级:从发现生成追问,按严重度赋因子
+            for f in sorted_findings:
+                cost = "low" if f.level == FindingLevel.INSUFFICIENT else "medium"
+                raw_questions.append({
+                    "target_finding_id": f.finding_id,
+                    "target_finding_title": f.title,
+                    "sub_claim_id": "",
+                    "question": f"请补充:{'; '.join(f.missing_evidence) or f.suggestion}",
+                    "what_to_provide": "; ".join(f.missing_evidence) or f.suggestion,
+                    "why_needed": f.reasoning,
+                    "evidence_type": "explanation",
+                    "evidence_format": "文字说明或截图",
+                    "uncertainty": 0.6 if f.level != FindingLevel.INSUFFICIENT else 0.4,
+                    "change_probability": 0.7 if f.level == FindingLevel.CONTRADICTION else 0.5,
+                    "answer_cost": cost,
+                })
+
+        questions = followup_service.generate_from_findings(session_id, raw_questions)
+        followup_service.save_questions(session_id, questions)
+
+        source = "llm" if llm_client.is_available() else "heuristic"
+        return {
+            "status": "ok",
+            "message": f"已生成 {len(questions)} 条追问,按预期信息价值排序",
+            "questions": questions,
+            "source": source,
+        }
+
     # ---- 4. 模型复核(复杂上下文,引用校验) ----
 
     def deep_review(self, session_id: str) -> DeepReviewResult:
@@ -599,6 +686,359 @@ class AgentService:
                     truncated=total_chars > 0,
                 ))
         return "\n\n".join(parts) or "(无材料)", coverage
+
+
+    # ---- 6. 主张-证据图:模型候选边提案 ----
+
+    def propose_graph_candidates(self, session_id: str) -> dict:
+        """让模型提出规则可能遗漏的候选子主张/候选边。
+
+        模型只提案(source=llm, status=pending),由用户逐条确认后生效。
+        候选边引用的 fact_id 必须在已确认事实中存在,否则丢弃(防幻觉)。
+        """
+        from app.models.claim_graph import (
+            ClaimEvidenceEdge,
+            EdgeRelation,
+            EvidenceDirection,
+            SubClaim,
+            TestAspect,
+        )
+        from app.services.claim_graph import claim_graph_service
+
+        store = data_store.require(session_id)
+        graph = store.claim_graph
+        if graph is None:
+            return {"status": "no_graph", "message": "尚未构建主张-证据图,请先构建规则图", "added": 0}
+
+        if not llm_client.is_available():
+            return {"status": "llm_unavailable", "message": "未接入模型,候选边提案需要 LLM 支持", "added": 0}
+
+        usable = store.usable_facts()
+        claims_text = "\n".join(f"- [{c.claim_id}] {c.text}" for c in store.session.claims)
+        facts_text = "\n".join(
+            f"- [{f.fact_id}] [{f.category.value}] {f.effective_value()}" for f in usable
+        ) or "(无已确认事实)"
+        existing_sc = "\n".join(f"- [{sc.test_aspect.value}] {sc.text}" for sc in graph.sub_claims) or "(无)"
+        existing_edges = "\n".join(
+            f"- {sc_text} <-{e.relation.value}- fact:{e.fact_id}"
+            for e in graph.edges
+            for sc_text in [next((s.text for s in graph.sub_claims if s.sub_claim_id == e.sub_claim_id), "?")]
+        ) or "(无)"
+
+        raw = llm_client.chat(
+            prompts.GRAPH_CANDIDATE_SYSTEM,
+            prompts.GRAPH_CANDIDATE_USER.format(
+                claims=claims_text,
+                facts=facts_text,
+                existing_sub_claims=existing_sc,
+                existing_edges=existing_edges,
+            ),
+            retries=1,
+        )
+        if raw is None:
+            return {"status": "llm_call_failed", "message": "模型调用失败,候选边未生成", "added": 0}
+
+        data = llm_client.parse_json_response(raw)
+        if not isinstance(data, dict):
+            return {"status": "llm_parse_failed", "message": "模型输出解析失败,候选边未生成", "added": 0}
+
+        # 校验:候选边引用的 fact_id 必须存在
+        valid_fact_ids = {f.fact_id for f in usable}
+        claim_ids = {c.claim_id for c in store.session.claims}
+        existing_texts = {sc.text for sc in graph.sub_claims}
+
+        cand_subs: list[SubClaim] = []
+        for item in data.get("candidate_sub_claims", []) or []:
+            if not isinstance(item, dict):
+                continue
+            text = (item.get("text") or "").strip()
+            cid = item.get("claim_id") or ""
+            if not text or text in existing_texts or cid not in claim_ids:
+                continue
+            try:
+                aspect = TestAspect(item.get("test_aspect", "other"))
+            except ValueError:
+                continue
+            cand_subs.append(SubClaim(
+                claim_id=cid,
+                text=text,
+                test_aspect=aspect,
+                scope_keywords=item.get("scope_keywords") or [],
+            ))
+
+        # 子主张文本 -> SubClaim 对象(含新提出的)
+        sc_by_text = {sc.text: sc for sc in graph.sub_claims}
+        for sc in cand_subs:
+            sc_by_text[sc.text] = sc
+
+        cand_edges: list[ClaimEvidenceEdge] = []
+        for item in data.get("candidate_edges", []) or []:
+            if not isinstance(item, dict):
+                continue
+            sc_text = (item.get("sub_claim_text") or "").strip()
+            fact_id = item.get("fact_id") or ""
+            target_sc = sc_by_text.get(sc_text)
+            if target_sc is None or fact_id not in valid_fact_ids:
+                continue  # 引用不存在的事实或子主张:丢弃,防幻觉
+            try:
+                relation = EdgeRelation(item.get("relation", "unknown"))
+                direction = EvidenceDirection(item.get("direction", "execution"))
+            except ValueError:
+                continue
+            cand_edges.append(ClaimEvidenceEdge(
+                sub_claim_id=target_sc.sub_claim_id,
+                fact_id=fact_id,
+                relation=relation,
+                basis=(item.get("basis") or "模型提案,未给出依据").strip(),
+                direction=direction,
+            ))
+
+        added = 0
+        if cand_subs or cand_edges:
+            claim_graph_service.add_candidates(session_id, cand_subs, cand_edges)
+            added = len(cand_subs) + len(cand_edges)
+
+        return {
+            "status": "ok",
+            "message": f"模型提出了 {len(cand_subs)} 条候选子主张、{len(cand_edges)} 条候选边,等待确认" if added else "模型未发现规则遗漏的候选边",
+            "added": added,
+            "candidate_sub_claims": len(cand_subs),
+            "candidate_edges": len(cand_edges),
+        }
+
+    # ---- 7. 学习迁移题(P2) ----
+
+    def generate_migration_question(self, session_id: str) -> dict:
+        """根据原发现生成不同表面情境、同一方法要点的迁移题。
+
+        Returns:
+            {status, message, question}
+        """
+        from app.models.version_diff import MigrationQuestion
+
+        store = data_store.require(session_id)
+        report = store.latest_report()
+        if report is None or not report.findings:
+            return {"status": "no_findings", "message": "尚无审查发现,无法生成迁移题", "question": None}
+
+        # 取最严重的发现作为迁移题来源
+        level_order = {FindingLevel.CONTRADICTION: 0, FindingLevel.RISK: 1, FindingLevel.INSUFFICIENT: 2}
+        source_finding = min(report.findings, key=lambda f: level_order.get(f.level, 9))
+
+        claims_text = "\n".join(f"- {c.text}" for c in store.session.claims)
+        exp_label = store.session.experiment_type.value
+
+        if llm_client.is_available():
+            raw = llm_client.chat(
+                prompts.MIGRATION_SYSTEM,
+                prompts.MIGRATION_USER.format(
+                    experiment_type=exp_label,
+                    claims=claims_text,
+                    rule_id=source_finding.rule_id,
+                    title=source_finding.title,
+                    reasoning=source_finding.reasoning,
+                    suggestion=source_finding.suggestion,
+                ),
+                temperature=0.7,
+                retries=1,
+            )
+            if raw:
+                data = llm_client.parse_json_response(raw)
+                if isinstance(data, dict) and data.get("scenario"):
+                    q = MigrationQuestion(
+                        session_id=session_id,
+                        source_finding_id=source_finding.finding_id,
+                        source_rule_id=source_finding.rule_id,
+                        method_point=data.get("method_point", ""),
+                        scenario=data["scenario"],
+                        question=data.get("question", ""),
+                        hint=data.get("hint", ""),
+                        reference_answer=data.get("reference_answer", ""),
+                        created_at=datetime.now().isoformat(),
+                    )
+                    store.migration_questions.append(q)
+                    data_store.persist(session_id)
+                    return {"status": "ok", "message": "迁移题已生成", "question": q, "source": "llm"}
+
+        # 启发式降级:基于规则类型的预设迁移情境
+        q = self._preset_migration(store, source_finding)
+        store.migration_questions.append(q)
+        data_store.persist(session_id)
+        return {"status": "ok", "message": "迁移题已生成(预设情境)", "question": q, "source": "preset"}
+
+    @staticmethod
+    def _preset_migration(store, source_finding) -> "MigrationQuestion":
+        """预设迁移情境(无模型时降级):按规则类型选不同领域的同构问题。"""
+        from app.models.version_diff import MigrationQuestion
+
+        rule = source_finding.rule_id
+        if "split" in rule or "generalization" in rule:
+            return MigrationQuestion(
+                session_id=store.session.session_id,
+                source_finding_id=source_finding.finding_id,
+                source_rule_id=rule,
+                method_point="泛化到新实体需要按组划分,防止同一实体数据泄漏",
+                scenario=(
+                    "小红做文本情感分类研究,主张'模型能准确分类新作者的文章'。"
+                    "她收集了 200 位作者的文章,用 train_test_split 随机划分后训练,"
+                    "测试准确率 94%,得出结论。"
+                ),
+                question="小红的实验能支持她的结论吗?问题出在哪里?",
+                hint="注意她的主张是'新作者',再看看她的划分方式。",
+                reference_answer=(
+                    "漏洞:主张是分类'新作者'的文章,但随机划分会让同一作者的文章"
+                    "同时出现在训练集和测试集(数据泄漏),模型可能记住了已知作者的写作风格。"
+                    "修改:按作者 ID 分组划分,确保测试集只含训练时未见过的作者。"
+                ),
+                created_at=datetime.now().isoformat(),
+            )
+        if "repetition" in rule or "stability" in rule:
+            return MigrationQuestion(
+                session_id=store.session.session_id,
+                source_finding_id=source_finding.finding_id,
+                source_rule_id=rule,
+                method_point="稳定性/可重复性主张需要多次运行的波动数据支持",
+                scenario=(
+                    "小刚研究推荐算法,主张'算法 X 比算法 Y 在不同数据分布下更鲁棒'。"
+                    "他各运行了一次实验,算法 X 的 NDCG 为 0.81,算法 Y 为 0.79,得出结论。"
+                ),
+                question="小刚的实验能支持'更鲁棒'的结论吗?",
+                hint="'鲁棒'意味着什么?单次运行能体现吗?",
+                reference_answer=(
+                    "漏洞:'更鲁棒'需要多次运行、多种数据分布下的表现对比,"
+                    "单次运行只能说明这一次略好,无法体现鲁棒性。"
+                    "修改:在多种数据分布下各运行多次,比较均值和方差的差异。"
+                ),
+                created_at=datetime.now().isoformat(),
+            )
+        return MigrationQuestion(
+            session_id=store.session.session_id,
+            source_finding_id=source_finding.finding_id,
+            source_rule_id=rule,
+            method_point="比较主张需要基线方法在同等条件下的对比结果",
+            scenario=(
+                "小美提出了新的图像分割模型,主张'新模型优于现有方法'。"
+                "她只运行了新模型,mIoU 达到 78%,没有运行任何基线,得出结论。"
+            ),
+            question="小美的实验能支持'优于现有方法'的结论吗?",
+            hint="比较需要什么?",
+            reference_answer=(
+                "漏洞:没有基线方法在相同数据与指标下的结果,'优于'无从谈起。"
+                "修改:选择代表性基线,在相同数据划分与指标下运行对比。"
+            ),
+            created_at=datetime.now().isoformat(),
+        )
+
+    # ---- 8. 迁移题评分(看推理过程) ----
+
+    def score_migration_answer(
+        self, session_id: str, question_id: str, answer_text: str
+    ) -> dict:
+        """评分迁移题回答:看推理过程(四维评分)。
+
+        Returns:
+            {status, message, answer}
+        """
+        from app.models.version_diff import MigrationAnswer
+
+        store = data_store.require(session_id)
+        question = next(
+            (q for q in store.migration_questions if q.question_id == question_id),
+            None,
+        )
+        if question is None:
+            return {"status": "not_found", "message": "迁移题不存在", "answer": None}
+
+        answer = MigrationAnswer(
+            question_id=question_id,
+            session_id=session_id,
+            answer_text=answer_text,
+            answered_at=datetime.now().isoformat(),
+        )
+
+        if llm_client.is_available():
+            raw = llm_client.chat(
+                prompts.MIGRATION_SCORE_SYSTEM,
+                prompts.MIGRATION_SCORE_USER.format(
+                    scenario=question.scenario,
+                    question=question.question,
+                    reference_answer=question.reference_answer,
+                    answer_text=answer_text,
+                ),
+                retries=1,
+            )
+            if raw:
+                data = llm_client.parse_json_response(raw)
+                if isinstance(data, dict):
+                    answer.identifies_core_issue = float(data.get("identifies_core_issue", 0))
+                    answer.explains_why = float(data.get("explains_why", 0))
+                    answer.proposes_fix = float(data.get("proposes_fix", 0))
+                    answer.reasoning_quality = float(data.get("reasoning_quality", 0))
+                    answer.feedback = data.get("feedback", "")
+                    answer.source = "llm"
+                    answer.total_score = (
+                        answer.identifies_core_issue + answer.explains_why
+                        + answer.proposes_fix + answer.reasoning_quality
+                    ) / 4.0
+                    store.migration_answers.append(answer)
+                    data_store.persist(session_id)
+                    return {"status": "ok", "message": "评分完成", "answer": answer}
+
+        # 启发式降级:关键词匹配评分
+        answer = self._heuristic_migration_score(question, answer)
+        store.migration_answers.append(answer)
+        data_store.persist(session_id)
+        return {"status": "ok", "message": "评分完成(启发式)", "answer": answer}
+
+    @staticmethod
+    def _heuristic_migration_score(question, answer) -> "MigrationAnswer":
+        """启发式迁移评分:基于参考答案关键词与回答的匹配度。"""
+        ref = question.reference_answer.lower()
+        ans = answer.answer_text.lower()
+
+        # 核心问题关键词:从参考答案提取关键概念
+        core_keywords = []
+        for kw in ("泄漏", "划分", "基线", "鲁棒", "稳定", "重复", "多次", "随机", "分组", "泛化", "新"):
+            if kw in ref:
+                core_keywords.append(kw)
+
+        # 识别核心问题:回答中是否提及核心关键词
+        if core_keywords:
+            hit = sum(1 for kw in core_keywords if kw in ans)
+            answer.identifies_core_issue = min(hit / max(len(core_keywords), 1), 1.0)
+        else:
+            answer.identifies_core_issue = 0.3 if len(ans) > 20 else 0.1
+
+        # 解释为什么:回答中是否有因果推理词
+        causal_words = ("因为", "由于", "导致", "使得", "从而", "所以", "原因")
+        answer.explains_why = min(
+            sum(1 for w in causal_words if w in ans) / 2.0, 1.0
+        ) if any(w in ans for w in causal_words) else 0.2
+
+        # 提出修改:回答中是否有修改方向词
+        fix_words = ("修改", "改为", "应该", "建议", "需要", "换成", "调整")
+        answer.proposes_fix = min(
+            sum(1 for w in fix_words if w in ans) / 2.0, 1.0
+        ) if any(w in ans for w in fix_words) else 0.2
+
+        # 推理质量:回答长度与结构(粗略)
+        length_score = min(len(ans) / 100.0, 1.0)
+        structure_score = 0.3 if ("\n" in ans or "。" in ans or ";" in ans) else 0.1
+        answer.reasoning_quality = min(length_score * 0.6 + structure_score, 1.0)
+
+        answer.total_score = (
+            answer.identifies_core_issue + answer.explains_why
+            + answer.proposes_fix + answer.reasoning_quality
+        ) / 4.0
+        answer.feedback = (
+            f"启发式评分:核心问题识别 {answer.identifies_core_issue:.0%},"
+            f"因果解释 {answer.explains_why:.0%},"
+            f"修改方向 {answer.proposes_fix:.0%},"
+            f"推理结构 {answer.reasoning_quality:.0%}。"
+            f"接入模型可获得更精细的推理过程评分。"
+        )
+        answer.source = "heuristic"
+        return answer
 
 
 agent_service = AgentService()

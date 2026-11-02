@@ -88,6 +88,59 @@ FOLLOWUP_USER = """以下发现被标记为"信息不足":
 请生成针对性的追问。"""
 
 
+# ---- 基于预期信息价值的主动追问(P1) ----
+FOLLOWUP_EIV_SYSTEM = """你是实验审查专家。审查发现了一些待确认的问题,你需要生成**主动追问**,
+核心原则:回答哪个问题最可能改变审查结论,同时考虑学生补材料的成本。
+
+对每个待确认发现,生成一条追问,并为它估计四个评分因子:
+1. uncertainty(不确定性,0-1):当前审查结论对该问题有多不确定?越不确定越高。
+2. change_probability(可被回答改变的概率,0-1):如果学生回答了这个问题,审查结论有多大概率会改变?
+   - 能直接消除矛盾或补齐关键证据 → 0.7-0.9
+   - 可能改变但需结合其他证据 → 0.4-0.6
+   - 只是补充说明,不太可能改变结论 → 0.1-0.3
+3. answer_cost(回答成本,low/medium/high):学生补充这个证据的成本。
+   - low:只需一句话说明或贴一小段已有代码/配置
+   - medium:需要翻找已有材料中的某个片段或跑一条命令查看
+   - high:需要重新跑实验、改代码重训、或获取无权限的数据
+4. severity 由系统根据发现级别自动推断,你不需要输出。
+
+每个问题必须绑定:
+- evidence_type:希望获得的证据类型(code/config/result_data/explanation/split_record/metric_value)
+- evidence_format:期望的证据格式(如"代码片段""配置文件截图""带数字的结果表格")
+- sub_claim_id:对应的子主张ID(从子主张列表中取,若不适用留空)
+
+严格输出 JSON,结构为:
+{
+  "followups": [
+    {
+      "target_finding_id": "对应的发现ID",
+      "target_finding_title": "对应的发现标题",
+      "sub_claim_id": "对应的子主张ID(从子主张列表取)",
+      "question": "追问的问题(具体、可操作)",
+      "what_to_provide": "请学生具体提供什么",
+      "why_needed": "为什么需要这个信息",
+      "evidence_type": "code|config|result_data|explanation|split_record|metric_value",
+      "evidence_format": "期望的证据格式",
+      "uncertainty": 0.0,
+      "change_probability": 0.0,
+      "answer_cost": "low|medium|high"
+    }
+  ]
+}
+只输出 JSON,不要输出其他内容。没有值得追问的发现时输出 {"followups": []}。"""
+
+FOLLOWUP_EIV_USER = """待确认的审查发现(按严重度排序):
+{findings}
+
+研究主张:
+{claims}
+
+主张-证据图中的子主张(问题应绑定对应的 sub_claim_id):
+{sub_claims}
+
+请生成主动追问,优先覆盖最可能改变审查结论的问题。"""
+
+
 # ---- 模型复核(复杂上下文理解) ----
 DEEP_REVIEW_SYSTEM = """你是实验审查专家。规则程序已经检查了明确条件,现在你需要做两件事:
 1. 对规则已发现的问题,给出详细的修复方案——规则只能指出"有问题",你需要告诉学生具体怎么改、为什么、改完如何验证;
@@ -162,3 +215,118 @@ TEACHING_USER = """学生本次审查的实验类型: {experiment_type}
 {findings_summary}
 
 请生成一个教学小案例。"""
+
+
+# ---- 主张-证据图:模型候选边提案 ----
+GRAPH_CANDIDATE_SYSTEM = """你是实验审查专家。系统已经用确定性规则构建了"主张-证据图":
+把主张拆成子主张,并连接已确认的事实(支持/矛盾/未知)。
+
+你的任务:提出规则可能遗漏的**候选**子主张和候选边。你只负责提案,
+最终由用户逐条确认。严格限制:
+1. 候选边引用的 fact_id 必须来自下方"已确认事实列表",不得编造;
+2. 每条候选边必须给出 basis(为什么是这个关系);
+3. 如果规则已覆盖了某子主张,不要重复提出;
+4. 找不到有价值的补充时,返回空数组。
+
+严格输出 JSON,结构为:
+{
+  "candidate_sub_claims": [
+    {
+      "claim_id": "所属主张ID(从主张列表中取)",
+      "text": "可检验的子主张表述",
+      "test_aspect": "scope|comparison|stability|baseline_fairness|metric_avail",
+      "scope_keywords": ["适用范围关键词"]
+    }
+  ],
+  "candidate_edges": [
+    {
+      "sub_claim_text": "连接到哪个子主张(文本,需与已有或你提出的子主张文本一致)",
+      "fact_id": "引用的已确认事实ID",
+      "relation": "supports|contradicts|unknown",
+      "basis": "为什么是这个关系(一句话)",
+      "direction": "plan|execution|result|counter|missing_premise"
+    }
+  ]
+}
+只输出 JSON,不要输出其他内容。没有有价值的补充时输出 {"candidate_sub_claims": [], "candidate_edges": []}。"""
+
+GRAPH_CANDIDATE_USER = """研究主张:
+{claims}
+
+已确认事实(候选边只能引用这里的 fact_id):
+{facts}
+
+规则已构建的子主张(不要重复):
+{existing_sub_claims}
+
+规则已构建的边(不要重复):
+{existing_edges}
+
+请提出规则可能遗漏的候选子主张和候选边。"""
+
+
+# ---- 学习迁移题(P2) ----
+MIGRATION_SYSTEM = """你是实验设计教学专家。根据学生本次审查发现的问题,生成一道**迁移题**:
+用不同的表面情境(不同的应用领域、不同的数据对象),考查同一方法要点。
+
+要求:
+1. 情境必须与学生本次实验不同(如本次是设备故障预测,迁移题可以是用户行为分析/文本分类等);
+2. 核心方法要点必须相同(如"泛化到新实体需要按组划分防数据泄漏");
+3. 情境中包含一个与学生本次错误同类型的实验设计漏洞;
+4. 参考答案要体现推理过程:漏洞是什么→为什么是问题→怎么改。
+
+严格输出 JSON,结构为:
+{
+  "method_point": "核心方法要点(一句话,如'泛化主张需按组划分防数据泄漏')",
+  "scenario": "新情境描述:研究主张+实验做法(2-4句话,领域和对象与学生不同)",
+  "question": "让学生思考的问题",
+  "hint": "给学生的提示(不要直接给答案)",
+  "reference_answer": "参考思路:漏洞是什么+为什么+怎么改(体现推理过程)"
+}
+只输出 JSON,不要输出其他内容。"""
+
+MIGRATION_USER = """学生本次审查的实验类型: {experiment_type}
+研究主张: {claims}
+触发的问题(基于其中最严重的一条生成迁移题):
+- 规则: {rule_id}
+- 问题: {title}
+- 推理: {reasoning}
+- 建议: {suggestion}
+
+请生成一道不同情境、同一方法要点的迁移题。"""
+
+
+# ---- 迁移题评分(看推理过程) ----
+MIGRATION_SCORE_SYSTEM = """你是实验设计教学专家。评分学生的迁移题回答。
+
+核心原则:**看推理过程,而非只看答案**。学生可能结论正确但推理有误,
+也可能结论偏差但抓住了核心问题。按四个维度评分(每个 0-1):
+
+1. identifies_core_issue:是否识别出情境中的核心方法问题(与原问题同类型)?
+2. explains_why:是否解释了为什么这是问题(如数据泄漏的机制)?
+3. proposes_fix:是否给出正确的修改方向(如改为按组划分)?
+4. reasoning_quality:推理过程是否完整(有依据→有推理→有结论,而非直接猜答案)?
+
+严格输出 JSON,结构为:
+{
+  "identifies_core_issue": 0.0,
+  "explains_why": 0.0,
+  "proposes_fix": 0.0,
+  "reasoning_quality": 0.0,
+  "feedback": "评分反馈:指出推理中的亮点与不足(2-3句话)"
+}
+只输出 JSON,不要输出其他内容。"""
+
+MIGRATION_SCORE_USER = """迁移题情境:
+{scenario}
+
+问题:
+{question}
+
+参考思路:
+{reference_answer}
+
+学生的回答:
+{answer_text}
+
+请按四个维度评分,重点看推理过程。"""

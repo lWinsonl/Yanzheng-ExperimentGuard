@@ -1,9 +1,20 @@
 import { useEffect, useState } from 'react'
-import type { DeepReviewResult, DeepReviewStatus, Finding, Followup, ReviewReport } from '../types'
-import { CATEGORY_LABELS, LEVEL_LABELS } from '../types'
-import { generateFollowups, runReview } from '../api'
+import type { ClaimGraph, DeepReviewResult, DeepReviewStatus, Finding, Followup, ReviewReport } from '../types'
+import {
+  ASPECT_LABELS,
+  CATEGORY_LABELS,
+  COUNTER_STATUS_LABELS,
+  DIRECTION_LABELS,
+  LEVEL_LABELS,
+  RELATION_LABELS,
+} from '../types'
+import { generateFollowups, getLatestReport, runReview } from '../api'
 import { FindingCard } from '../components/FindingCard'
 import { DeepReviewPanel } from '../components/DeepReviewPanel'
+import { ClaimGraphPanel } from '../components/ClaimGraphPanel'
+import { FollowupPanel } from '../components/FollowupPanel'
+import { VersionDiffPanel } from '../components/VersionDiffPanel'
+import { MigrationQuiz } from '../components/MigrationQuiz'
 import { TeachingCaseView } from '../components/TeachingCaseView'
 import { LoadingDots } from '../components/LoadingDots'
 
@@ -24,6 +35,7 @@ export function ReportPage({ sessionId, title, claimTexts, onNext, onBack }: Pro
   const [error, setError] = useState('')
   const [followups, setFollowups] = useState<Followup[]>([])
   const [deepResult, setDeepResult] = useState<DeepReviewResult | null>(null)
+  const [graph, setGraph] = useState<ClaimGraph | null>(null)
 
   async function run() {
     setBusy(true)
@@ -34,6 +46,15 @@ export function ReportPage({ sessionId, title, claimTexts, onNext, onBack }: Pro
       setError(e instanceof Error ? e.message : '审查失败')
     } finally {
       setBusy(false)
+    }
+  }
+
+  /** 追问回答后刷新报告(后端已重算审查,前端只取最新) */
+  async function refreshReport() {
+    try {
+      setReport(await getLatestReport(sessionId))
+    } catch {
+      /* 保持旧报告 */
     }
   }
 
@@ -113,6 +134,34 @@ export function ReportPage({ sessionId, title, claimTexts, onNext, onBack }: Pro
         if (f.verified_quote) lines.push(`- **原文引用**:"${f.verified_quote}"`)
         if (f.material_filename) lines.push(`- **来源材料**:${f.material_filename}`)
         if (f.suggestion) lines.push(`- **建议**:${f.suggestion}`)
+      })
+    }
+    if (graph) {
+      lines.push('')
+      lines.push('## 主张-证据图')
+      const claimIdSet = [...new Set(graph.sub_claims.map((sc) => sc.claim_id))]
+      claimIdSet.forEach((cid) => {
+        const cText = claimTexts[cid] ?? cid
+        const subs = graph.sub_claims.filter((sc) => sc.claim_id === cid && sc.status !== 'rejected')
+        lines.push('')
+        lines.push(`### 主张:${cText}`)
+        subs.forEach((sc) => {
+          lines.push('')
+          lines.push(`#### [${ASPECT_LABELS[sc.test_aspect]}] ${sc.text}`)
+          const edges = graph.edges.filter((e) => e.sub_claim_id === sc.sub_claim_id && e.status !== 'rejected')
+          edges.forEach((e) => {
+            const rel = e.corrected_relation ?? e.relation
+            lines.push(`- **${RELATION_LABELS[rel]}**(${DIRECTION_LABELS[e.direction]}):${e.basis}`)
+          })
+          const check = graph.counter_checks.find((cc) => cc.sub_claim_id === sc.sub_claim_id)
+          if (check) {
+            lines.push(`- **反证检查**:${COUNTER_STATUS_LABELS[check.proof_status]}`)
+            if (check.alternative_explanation) lines.push(`  - 替代解释:${check.alternative_explanation}`)
+            if (check.missing_to_prove_absence.length > 0) {
+              lines.push(`  - 升级为"证明不存在反证"还需:${check.missing_to_prove_absence.join('; ')}`)
+            }
+          }
+        })
       })
     }
     for (const level of order) {
@@ -201,28 +250,27 @@ export function ReportPage({ sessionId, title, claimTexts, onNext, onBack }: Pro
             ) : null,
           )}
 
-          {/* 智能体追问:信息不足时自动展开 */}
-          {followups.length > 0 && (
-            <div className="followup-panel">
-              <div className="agent-section-header">
-                <span>🤖 智能体追问:请补充以下信息</span>
-              </div>
-              {followups.map((f, i) => (
-                <div key={i} className="agent-item followup-item">
-                  <div className="followup-question">❓ {f.question}</div>
-                  {f.what_to_provide && (
-                    <div className="muted">请提供:{f.what_to_provide}</div>
-                  )}
-                  {f.why_needed && (
-                    <div className="muted">为什么需要:{f.why_needed}</div>
-                  )}
-                </div>
-              ))}
-            </div>
-          )}
+          {/* 主张-证据图:可校准的子主张-证据连接 */}
+          <ClaimGraphPanel
+            sessionId={sessionId}
+            claimTexts={claimTexts}
+            onGraphChange={setGraph}
+          />
+
+          {/* 主动追问:基于预期信息价值排序,回答后追踪发现变化 */}
+          <FollowupPanel
+            sessionId={sessionId}
+            onAnswerRecorded={refreshReport}
+          />
 
           {/* 模型复核:详细修改建议 + 规则盲区 */}
           <DeepReviewPanel sessionId={sessionId} onResultChange={setDeepResult} />
+
+          {/* 版本差异复审:稳定身份配对 + 五态判定 + 修改理由对照 + 人工标签(P2) */}
+          <VersionDiffPanel sessionId={sessionId} />
+
+          {/* 学习迁移评估:不同情境同方法要点,评分看推理过程(P2) */}
+          <MigrationQuiz sessionId={sessionId} />
 
           {/* 教学小案例:训练实验设计能力 */}
           <div className="teaching-section">

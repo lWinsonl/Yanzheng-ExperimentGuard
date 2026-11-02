@@ -1,4 +1,16 @@
 from app.models.claim import Claim, ExperimentType, ReviewSession
+from app.models.claim_graph import (
+    ClaimEvidenceEdge,
+    ClaimGraph,
+    CounterEvidenceCheck,
+    CounterProofStatus,
+    EdgeRelation,
+    EdgeSource,
+    EdgeStatus,
+    EvidenceDirection,
+    SubClaim,
+    TestAspect,
+)
 from app.models.evidence import (
     ExtractedFact,
     FactCategory,
@@ -8,6 +20,13 @@ from app.models.evidence import (
     ParsedDocument,
     SourceSpan,
 )
+from app.models.followup import (
+    AnswerCost,
+    EvidenceType,
+    FollowupQuestion,
+    FollowupStats,
+    FollowupStatus,
+)
 from app.models.review import (
     Finding,
     FindingLevel,
@@ -15,11 +34,35 @@ from app.models.review import (
     RecheckResult,
     ReviewReport,
 )
+from app.models.version_diff import (
+    FactChange,
+    FindingIdentity,
+    ManualReviewLabel,
+    MigrationAnswer,
+    MigrationQuestion,
+    MigrationScoreDimension,
+    RevisionAlignment,
+    RevisionAlignmentLevel,
+    VersionDiffComparison,
+    VersionDiffResult,
+    VersionDiffStats,
+    VersionDiffStatus,
+)
 
 __all__ = [
     "Claim",
     "ExperimentType",
     "ReviewSession",
+    "ClaimEvidenceEdge",
+    "ClaimGraph",
+    "CounterEvidenceCheck",
+    "CounterProofStatus",
+    "EdgeRelation",
+    "EdgeSource",
+    "EdgeStatus",
+    "EvidenceDirection",
+    "SubClaim",
+    "TestAspect",
     "ExtractedFact",
     "FactCategory",
     "FactStatus",
@@ -27,9 +70,26 @@ __all__ = [
     "MaterialRole",
     "ParsedDocument",
     "SourceSpan",
+    "AnswerCost",
+    "EvidenceType",
+    "FollowupQuestion",
+    "FollowupStats",
+    "FollowupStatus",
     "Finding",
     "FindingLevel",
     "RecheckComparison",
     "RecheckResult",
     "ReviewReport",
+    "FactChange",
+    "FindingIdentity",
+    "ManualReviewLabel",
+    "MigrationAnswer",
+    "MigrationQuestion",
+    "MigrationScoreDimension",
+    "RevisionAlignment",
+    "RevisionAlignmentLevel",
+    "VersionDiffComparison",
+    "VersionDiffResult",
+    "VersionDiffStats",
+    "VersionDiffStatus",
 ]

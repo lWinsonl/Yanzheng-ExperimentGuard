@@ -12,12 +12,20 @@ from pathlib import Path
 
 from app.config import settings
 from app.models.claim import ReviewSession
+from app.models.claim_graph import ClaimGraph
 from app.models.evidence import ExtractedFact, ParsedDocument
+from app.models.followup import FollowupQuestion
 from app.models.review import RecheckResult, ReviewReport
+from app.models.version_diff import (
+    ManualReviewLabel,
+    MigrationAnswer,
+    MigrationQuestion,
+    VersionDiffResult,
+)
 
 
 class SessionStore:
-    """单会话的聚合根:会话、文档、事实、报告、复查结果。"""
+    """单会话的聚合根:会话、文档、事实、报告、复查结果、主张-证据图、追问、版本差异、迁移。"""
 
     def __init__(self, session: ReviewSession):
         self.session = session
@@ -25,6 +33,12 @@ class SessionStore:
         self.facts: dict[str, ExtractedFact] = {}
         self.reports: dict[str, ReviewReport] = {}
         self.rechecks: dict[str, RecheckResult] = {}
+        self.claim_graph: ClaimGraph | None = None
+        self.followup_questions: list[FollowupQuestion] = []
+        self.version_diffs: list[VersionDiffResult] = []
+        self.migration_questions: list[MigrationQuestion] = []
+        self.migration_answers: list[MigrationAnswer] = []
+        self.manual_labels: list[ManualReviewLabel] = []
 
     # ---- 事实 ----
     def add_fact(self, fact: ExtractedFact) -> None:
@@ -74,6 +88,18 @@ class DataStore:
                     store.reports[k] = ReviewReport.model_validate(v)
                 for k, v in payload.get("rechecks", {}).items():
                     store.rechecks[k] = RecheckResult.model_validate(v)
+                if payload.get("claim_graph"):
+                    store.claim_graph = ClaimGraph.model_validate(payload["claim_graph"])
+                for fq in payload.get("followup_questions", []):
+                    store.followup_questions.append(FollowupQuestion.model_validate(fq))
+                for vd in payload.get("version_diffs", []):
+                    store.version_diffs.append(VersionDiffResult.model_validate(vd))
+                for mq in payload.get("migration_questions", []):
+                    store.migration_questions.append(MigrationQuestion.model_validate(mq))
+                for ma in payload.get("migration_answers", []):
+                    store.migration_answers.append(MigrationAnswer.model_validate(ma))
+                for ml in payload.get("manual_labels", []):
+                    store.manual_labels.append(ManualReviewLabel.model_validate(ml))
                 self._sessions[session.session_id] = store
             except Exception:  # noqa: BLE001
                 continue  # 损坏文件跳过,不阻断启动
@@ -115,6 +141,12 @@ class DataStore:
                 "facts": {k: v.model_dump() for k, v in store.facts.items()},
                 "reports": {k: v.model_dump() for k, v in store.reports.items()},
                 "rechecks": {k: v.model_dump() for k, v in store.rechecks.items()},
+                "claim_graph": store.claim_graph.model_dump() if store.claim_graph else None,
+                "followup_questions": [q.model_dump() for q in store.followup_questions],
+                "version_diffs": [d.model_dump() for d in store.version_diffs],
+                "migration_questions": [q.model_dump() for q in store.migration_questions],
+                "migration_answers": [a.model_dump() for a in store.migration_answers],
+                "manual_labels": [l.model_dump() for l in store.manual_labels],
             }
             tmp.write_text(json.dumps(payload, ensure_ascii=False, indent=1), encoding="utf-8")
             os.replace(tmp, path)  # 原子替换:要么完整旧文件,要么完整新文件

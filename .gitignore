@@ -28,3 +28,6 @@ data/
 
 # Local evaluation runs may contain private materials; publish only reviewed synthetic reports.
 evaluation/runs/
+frontend/test-results/
+frontend/playwright-report/
+evaluation/reports/**/browser/

@@ -93,8 +93,10 @@ export function SetupPage({ onCreated, onNext, onOpenSession }: Props) {
       </p>
 
       <div className="form-group">
-        <label>审查标题</label>
+        <label htmlFor="review-title">审查标题</label>
         <input
+          id="review-title"
+          maxLength={200}
           value={title}
           onChange={(e) => setTitle(e.target.value)}
           placeholder="例如:设备故障预测模型对比实验"
@@ -103,8 +105,9 @@ export function SetupPage({ onCreated, onNext, onOpenSession }: Props) {
       </div>
 
       <div className="form-group">
-        <label>实验类型</label>
+        <label htmlFor="experiment-type">实验类型</label>
         <select
+          id="experiment-type"
           value={expType}
           onChange={(e) => setExpType(e.target.value as ExperimentType)}
           disabled={!!session}
@@ -115,8 +118,9 @@ export function SetupPage({ onCreated, onNext, onOpenSession }: Props) {
       </div>
 
       <div className="form-group">
-        <label>研究主张(每行一条)</label>
+        <label htmlFor="research-claims">研究主张(每行一条)</label>
         <textarea
+          id="research-claims"
           rows={4}
           value={claimsText}
           onChange={(e) => setClaimsText(e.target.value)}

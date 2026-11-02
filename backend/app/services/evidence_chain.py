@@ -73,10 +73,22 @@ class EvidenceChainService:
             dropped_reasons 记录因引用校验失败被丢弃的事实及原因。
         """
         store = data_store.require(session_id)
-        role = MaterialRole(role_str) if role_str in ("plan", "execution") else MaterialRole.PLAN
+        role = MaterialRole(role_str)
         kind = guess_kind(filename)
 
+        from pathlib import PurePosixPath
+        from app.parsers.base import EXT_KIND_MAP
+        suffix = PurePosixPath(filename.replace("\\", "/")).suffix.lower()
+        if suffix and suffix not in EXT_KIND_MAP:
+            raise ValueError("不支持此文件格式；请选择文本、代码、CSV、PDF、DOCX或XLSX")
+        if raw.startswith(b"PK\x03\x04") and kind not in (MaterialKind.DOCX, MaterialKind.XLSX):
+            raise ValueError("文件内容为压缩文档，与扩展名不符，请使用正确的DOCX/XLSX文件名")
+        if raw.startswith(b"%PDF") and kind != MaterialKind.PDF:
+            raise ValueError("文件内容为PDF，请使用.pdf扩展名")
+
         doc = get_parser(kind).parse(raw, filename, role)
+        if not doc.content.strip() and not doc.ocr_required:
+            raise ValueError("材料没有可提取的文字，请检查内容后重新上传")
         store.docs[doc.material_id] = doc
         store.session.material_ids.append(doc.material_id)
 
@@ -159,7 +171,7 @@ class EvidenceChainService:
             删除的材料数量。
         """
         store = data_store.require(session_id)
-        role = MaterialRole(role_str) if role_str in ("plan", "execution") else MaterialRole.PLAN
+        role = MaterialRole(role_str)
 
         to_remove = [mid for mid, d in store.docs.items() if d.role == role and mid != keep_material_id]
         for mid in to_remove:

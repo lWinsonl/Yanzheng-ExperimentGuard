@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
 import type { MigrationAnswer, MigrationQuestion } from '../types'
 import {
   answerMigration,
@@ -22,30 +22,33 @@ const DIMENSION_LABELS: Record<string, string> = {
  */
 export function MigrationQuiz({ sessionId }: Props) {
   const [questions, setQuestions] = useState<MigrationQuestion[]>([])
-  const [activeQuestion, setActiveQuestion] = useState<MigrationQuestion | null>(
-    null,
-  )
+  const [activeQuestionId, setActiveQuestionId] = useState<string | null>(null)
+  const activeQuestion = questions.find((q) => q.question_id === activeQuestionId) ?? questions.at(-1) ?? null
   const [answer, setAnswer] = useState('')
   const [result, setResult] = useState<MigrationAnswer | null>(null)
+  const [savedAnswers, setSavedAnswers] = useState<Record<string, MigrationAnswer>>({})
+  const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
   const [showReference, setShowReference] = useState(false)
   const [message, setMessage] = useState('')
 
-  const loadQuestions = useCallback(async () => {
-    try {
-      const { questions: qs } = await listMigrationQuestions(sessionId)
-      setQuestions(qs)
-      if (qs.length > 0 && !activeQuestion) {
-        setActiveQuestion(qs[qs.length - 1])
-      }
-    } catch {
-      setQuestions([])
-    }
-  }, [sessionId, activeQuestion])
-
   useEffect(() => {
-    loadQuestions()
-  }, [loadQuestions])
+    let active = true
+    listMigrationQuestions(sessionId).then(({ questions: items, answers: attempts }) => {
+      if (!active) return
+      const saved = Object.fromEntries((attempts ?? []).map((attempt) => [attempt.question_id, attempt]))
+      setQuestions(items)
+      setSavedAnswers(saved)
+      const latest = items.at(-1)
+      if (latest && saved[latest.question_id]) {
+        setAnswer(saved[latest.question_id].answer_text)
+        setResult(saved[latest.question_id])
+      }
+    })
+      .catch(() => { if (active) setMessage('加载练习失败，请稍后重试。') })
+      .finally(() => { if (active) setLoading(false) })
+    return () => { active = false }
+  }, [sessionId])
 
   const handleGenerate = async () => {
     setBusy(true)
@@ -60,7 +63,7 @@ export function MigrationQuiz({ sessionId }: Props) {
         return
       }
       const q = response.question
-      setActiveQuestion(q)
+      setActiveQuestionId(q.question_id)
       setQuestions((prev) => [...prev, q])
       setMessage('迁移题已生成')
     } catch (e) {
@@ -82,6 +85,7 @@ export function MigrationQuiz({ sessionId }: Props) {
       }
       const r = response.answer
       setResult(r)
+      setSavedAnswers((previous) => ({ ...previous, [r.question_id]: r }))
       setMessage(r.score_status === 'model_feedback'
         ? '已生成本次推理反馈。请核对理由，单次结果不代表已掌握方法。'
         : '作答已保存，本次未给分。请对照参考思路自查，或请教师复核。')
@@ -93,9 +97,9 @@ export function MigrationQuiz({ sessionId }: Props) {
   }
 
   const handleSelectQuestion = (q: MigrationQuestion) => {
-    setActiveQuestion(q)
-    setResult(null)
-    setAnswer('')
+    setActiveQuestionId(q.question_id)
+    setResult(savedAnswers[q.question_id] ?? null)
+    setAnswer(savedAnswers[q.question_id]?.answer_text ?? '')
     setShowReference(false)
     setMessage('')
   }
@@ -104,7 +108,7 @@ export function MigrationQuiz({ sessionId }: Props) {
     <div className="migration-panel">
       <div className="panel-header">
         <h3>学习迁移评估</h3>
-        <button className="btn-primary" onClick={handleGenerate} disabled={busy}>
+        <button className="btn-primary" onClick={handleGenerate} disabled={busy || loading}>
           {busy ? '生成中...' : '生成迁移题'}
         </button>
       </div>
@@ -155,6 +159,7 @@ export function MigrationQuiz({ sessionId }: Props) {
           {/* 作答区 */}
           <div className="migration-answer-area">
             <textarea
+              aria-label="迁移练习作答"
               value={answer}
               onChange={(e) => setAnswer(e.target.value)}
               placeholder="请写出你的推理过程:这个新实验中存在什么问题?为什么?你会怎么修改?"

@@ -39,13 +39,16 @@ def run_stage(name, command, cwd, env, out, timeout=180):
 
 def source_hash():
     digest = hashlib.sha256()
-    roots = [ROOT / p for p in ("backend/app", "backend/tests", "backend/system_tests", "frontend/src", "evaluation")]
+    roots = [ROOT / p for p in ("backend/app", "backend/tests", "backend/system_tests", "frontend/src", "frontend/e2e", "frontend/public", "evaluation")]
     for directory in roots:
         for p in sorted(directory.rglob("*")):
-            if p.suffix not in (".py", ".tsx", ".ts", ".css", ".json") or any(x in p.parts for x in ("runs", "reports", "__pycache__")):
+            if p.suffix not in (".py", ".tsx", ".ts", ".css", ".json", ".csv") or any(x in p.parts for x in ("runs", "reports", "__pycache__")):
                 continue
             digest.update(p.relative_to(ROOT).as_posix().encode())
             digest.update(p.read_bytes())
+    for name in ("frontend/package.json", "frontend/package-lock.json", "frontend/playwright.config.ts"):
+        digest.update(name.encode())
+        digest.update((ROOT / name).read_bytes())
     return digest.hexdigest()
 
 
@@ -75,13 +78,36 @@ def percent(value):
     return f"{value:.1%}" if value is not None else "不适用（分母为0）"
 
 
+def browser_summary(path):
+    if not path.exists():
+        return {"error": "Browser stage did not produce results"}
+    raw = json.loads(path.read_text(encoding="utf-8"))
+    cases = []
+    def walk(suite):
+        for spec in suite.get("specs", []):
+            for test in spec.get("tests", []):
+                results = test.get("results", [])
+                last = results[-1] if results else {}
+                cases.append({"title": spec["title"], "project": test.get("projectName"),
+                    "status": last.get("status", "missing"), "duration_ms": last.get("duration"),
+                    "annotations": test.get("annotations", []),
+                    "errors": [e.get("message", "") for e in last.get("errors", [])]})
+        for nested in suite.get("suites", []):
+            walk(nested)
+    for suite in raw.get("suites", []):
+        walk(suite)
+    return {"stats": raw.get("stats", {}), "cases": cases,
+            "projects": [{"name": p.get("name"), "viewport": p.get("use", {}).get("viewport") or p.get("metadata", {}).get("viewport")}
+                         for p in raw.get("config", {}).get("projects", [])]}
+
+
 def markdown(result):
     tests, benchmark = result["tests"], result.get("benchmark")
     lines = ["# 研证离线系统测试与能力评测报告", "", f"执行时间：{result['started_at_utc']}（UTC）", "",
              f"源码基线：`{result['source_commit']}`；工作区包含本轮新增评测代码。",
              f"源码指纹：`{result['source_sha256']}`", "",
              "## 结论边界", "",
-             "本次没有读取真实会话、访问线上服务或调用智谱。模型故障测试使用桩；合成案例的候选事实由脚本确认。浏览器页面交互、生产冷启动、真实模型与学生效果没有在本次执行中验证。", "",
+             "本次没有读取真实会话、访问线上服务或调用智谱。模型故障测试使用桩；合成案例的候选事实由脚本确认。生产冷启动、真实模型与学生效果未验证。浏览器交互以独立浏览器阶段记录为准。", "",
              "## 测试与构建", "",
              f"测试 {tests.get('total', 0)} 项：通过 {tests.get('passed', 0)}，失败 {tests.get('failed', 0)}，错误 {tests.get('errors', 0)}，已复现未修缺陷 XFAIL {tests.get('xfailed', 0)}，其他跳过 {tests.get('skipped', 0)}。XFAIL 不计为通过。", "",
              "| 阶段 | 退出码 | 秒 | 日志 |", "| --- | ---: | ---: | --- |"]
@@ -89,8 +115,16 @@ def markdown(result):
         lines.append(f"| {stage['name']} | {stage['exit_code']} | {stage['duration_seconds']} | [{stage['log']}]({stage['log']}) |")
     lines += ["", "## 已复现的未修缺陷", ""]
     lines.extend(f"- {x['reason']}。复现：`{x['test']}`。" for x in tests.get("known_defects", []))
+    if not tests.get("known_defects"):
+        lines.append("本次没有预期失败标记；原5项缺陷已转为必须正常通过的回归测试。")
     lines += ["", f"本地回归发布门槛：**{'通过' if result['release_gate']['passed'] else '未通过'}**。该门槛不证明真实模型或教学效果。",
-              "`known-defects-audit` 使用 `--runxfail` 单独暴露未修断言；它的退出码1表示确有失败，不计为正常通过。"]
+              "`known-defects-audit` 独立执行原5项缺陷用例；退出码0表示这些回归通过，退出码1仍代表真实失败。"]
+    if result.get("browser"):
+        b = result["browser"]
+        lines += ["", "## 真实浏览器回归", "", f"浏览器统计：{json.dumps(b.get('stats', {}), ensure_ascii=False)}。", "",
+                  "| 项目 | 测试 | 结果 |", "| --- | --- | --- |"]
+        lines.extend(f"| {c['project']} | {c['title']} | {c['status']} |" for c in b.get("cases", []))
+        lines += ["", "浏览器仅访问隔离本机服务，使用临时浏览器上下文，不使用用户Chrome资料。覆盖上传与失败保留、事实确认、追问、复查、练习保存、刷新、非法本地状态恢复和390/768/1440宽度；不替代真实供应商或生产部署验收。"]
     if benchmark:
         s = benchmark["summary"]
         lines += ["", "## 合成能力探针", "",
@@ -113,7 +147,7 @@ def markdown(result):
         lines.extend(f"- `{r['case_id']}`：金标 `{r['gold']}`，输出 `{r['prediction']}`；{r['rationale']}。"
                      for r in benchmark["cases"] if not r["correct"])
         lines += ["", f"本机串行中位耗时 {benchmark['latency']['median_ms']:.1f} ms；最近秩 P95 {benchmark['latency']['nearest_rank_p95_ms']:.1f} ms。含本地保存，不含模型、网络、渲染；不可当作线上 SLA。"]
-    lines += ["", "## 后续工作", "", "先复核并修复缺陷，之后冻结模型、提示词与数据集，再进行教师盲评和同模型基线比较。教学效果必须通过独立学生任务验证。完整协议见仓库 `docs/evaluation/plan.md`。", ""]
+    lines += ["", "## 后续工作", "", "公开开发集上的修复通过不代表真实科研准确率。应冻结本轮代码与格式，再收集独立教师标注的留出材料、完成同模型基线对比。教学效果必须通过独立学生任务验证。完整协议见仓库 `docs/evaluation/plan.md`。", ""]
     return "\n".join(lines)
 
 
@@ -122,7 +156,10 @@ def main():
     parser.add_argument("--output", type=Path, default=ROOT / "evaluation" / "runs" / datetime.now().strftime("%Y%m%d-%H%M%S"))
     parser.add_argument("--skip-frontend", action="store_true")
     parser.add_argument("--release-gate", action="store_true", help="Exit 2 if known defects or test/build failures block release")
+    parser.add_argument("--browser", action="store_true", help="Include isolated real headless browser workflow checks")
     args = parser.parse_args()
+    if args.browser and args.skip_frontend:
+        parser.error("--browser requires a fresh frontend build; do not combine with --skip-frontend")
     out = args.output.resolve()
     out.mkdir(parents=True, exist_ok=True)
     # Never mutate dotenv; environment overrides prevent spending real provider credits.
@@ -138,12 +175,20 @@ def main():
                     "-o", "faulthandler_timeout=45", f"--junitxml={out / 'junit.xml'}"], ROOT / "backend", env, out)]
         audit = run_stage("known-defects-audit", [sys.executable, "-m", "pytest", "system_tests/test_known_defects.py",
             "-q", "--runxfail", f"--junitxml={out / 'known-defects.xml'}"], ROOT / "backend", env, out)
-        audit["expected_exit_codes"] = [0, 1]
+        audit["expected_exit_codes"] = [0]
         stages.append(audit)
         if not args.skip_frontend:
             npm = shutil.which("npm.cmd" if os.name == "nt" else "npm") or "npm"
             stages.append(run_stage("frontend-build", [npm, "run", "build"], ROOT / "frontend", env, out))
             stages.append(run_stage("frontend-lint", [npm, "run", "lint"], ROOT / "frontend", env, out))
+        browser = None
+        if args.browser:
+            browser_directory = out / "browser"
+            browser_directory.mkdir(exist_ok=True)
+            (browser_directory / "results.json").unlink(missing_ok=True)
+            env["YANZHENG_BROWSER_REPORT_DIR"] = str(browser_directory)
+            stages.append(run_stage("browser-tests", [sys.executable, "-m", "evaluation.run_browser"], ROOT, env, out))
+            browser = browser_summary(browser_directory / "results.json")
         os.environ.update(LLM_API_KEY="", LLM_BASE_URL="", LLM_MODEL="", DATA_DIR=str(Path(temporary) / "benchmark"))
         sys.path.insert(0, str(ROOT / "backend"))
         from .benchmark import run_offline
@@ -161,6 +206,9 @@ def main():
                   python_version=sys.version.split()[0], provider_calls=0, production_requests=0,
                   stages=stages, tests=test_counts, benchmark=benchmark,
                   sanity_control=sanity, known_defect_audit=junit_summary(out / "known-defects.xml"), release_gate=release_gate)
+    if browser is not None:
+        result["browser"] = browser
+        (out / "browser-summary.json").write_text(json.dumps(browser, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     result["package_versions"] = {name: importlib.metadata.version(name)
         for name in ("pytest", "fastapi", "pydantic", "httpx", "starlette", "anyio")}
     (out / "results.json").write_text(json.dumps(result, ensure_ascii=False, indent=2, allow_nan=False) + "\n", encoding="utf-8")

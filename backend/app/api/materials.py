@@ -2,10 +2,13 @@
 
 from __future__ import annotations
 
+from typing import Literal
+
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 from pydantic import BaseModel, Field
 
 from app.services import evidence_chain
+from app.models.evidence import MaterialRole
 
 router = APIRouter(prefix="/api/sessions/{session_id}/materials", tags=["materials"])
 
@@ -13,8 +16,8 @@ router = APIRouter(prefix="/api/sessions/{session_id}/materials", tags=["materia
 @router.post("/upload")
 async def upload_material(
     session_id: str,
-    role: str = Form(...),
-    mode: str = Form("append"),
+    role: MaterialRole = Form(...),
+    mode: Literal["append", "replace"] = Form("append"),
     file: UploadFile = File(...),
 ):
     """上传文件材料。role 为 plan 或 execution;mode 为 append(补充)或 replace(替换旧版本)。"""
@@ -31,6 +34,8 @@ async def upload_material(
             evidence_chain.clear_materials(session_id, role, keep_material_id=doc.material_id)
     except KeyError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
     return {
         "material_id": doc.material_id,
         "filename": doc.filename,
@@ -44,10 +49,10 @@ async def upload_material(
 
 
 class TextMaterialRequest(BaseModel):
-    role: str
+    role: MaterialRole
     filename: str
     content: str = Field(min_length=1, max_length=100000)
-    mode: str = "append"  # append(补充) / replace(替换旧版本)
+    mode: Literal["append", "replace"] = "append"
 
 
 @router.post("/text")
@@ -61,6 +66,8 @@ def add_text_material(session_id: str, req: TextMaterialRequest):
             evidence_chain.clear_materials(session_id, req.role, keep_material_id=doc.material_id)
     except KeyError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
     return {
         "material_id": doc.material_id,
         "filename": doc.filename,

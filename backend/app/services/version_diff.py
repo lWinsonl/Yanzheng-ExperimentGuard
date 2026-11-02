@@ -67,6 +67,7 @@ class VersionDiffService:
             claim_ids=finding.claim_ids,
             evidence_categories=evidence_cats,
             problem_category=problem_cat,
+            issue_scope=finding.issue_scope,
         )
 
     # ---- 版本差异计算(五态) ----
@@ -80,113 +81,47 @@ class VersionDiffService:
     ) -> VersionDiffResult:
         """计算前后报告的版本差异:按稳定身份配对,输出五态。"""
         store = data_store.require(session_id)
-        current_fact_ids = set(store.facts.keys())
+        def key(f):
+            return (f.rule_id, tuple(sorted(f.claim_ids)), f.issue_scope)
 
-        # 旧发现的证据 fact_id 集合(用于判定证据是否消失)
-        old_evidence_fact_ids: set[str] = set()
+        old_groups, new_groups = {}, {}
         for f in old_report.findings:
-            old_evidence_fact_ids.update(ref.fact_id for ref in f.evidence)
-
-        # 按身份哈希索引新发现
-        new_by_identity: dict[str, list[Finding]] = {}
+            old_groups.setdefault(key(f), []).append(f)
         for f in new_report.findings:
-            ident = self.compute_identity(f)
-            new_by_identity.setdefault(ident.identity_hash, []).append(f)
-
-        comparisons: list[VersionDiffComparison] = []
-        matched_new_ids: set[str] = set()
-
-        # 遍历旧发现,判定 resolved / mitigated / persists / insufficient_evidence
+            new_groups.setdefault(key(f), []).append(f)
+        comparisons, matched_new_ids = [], set()
         for old_f in old_report.findings:
             ident = self.compute_identity(old_f)
-            matches = new_by_identity.get(ident.identity_hash, [])
-
-            if not matches:
-                # 身份未匹配:判断是已解决还是证据不足
-                ev_ids = {ref.fact_id for ref in old_f.evidence}
-                ev_gone = ev_ids - current_fact_ids  # 旧证据已消失
-                ev_cats = {ref.category.value for ref in old_f.evidence}
-                # 当前是否还有同类证据
-                has_same_cat = any(
-                    f.category.value in ev_cats for f in store.facts.values()
-                )
-                if ev_gone and not has_same_cat:
-                    # 旧证据消失且无同类新证据:无法判定
-                    comparisons.append(VersionDiffComparison(
-                        old_finding_id=old_f.finding_id,
-                        identity=ident,
-                        status=VersionDiffStatus.INSUFFICIENT_EVIDENCE,
-                        reason=(
-                            f"原证据({'; '.join(ev_cats)})已被替换且无同类新证据,"
-                            f"无法确认问题是否解决。请补充{'; '.join(ev_cats)}相关材料。"
-                        ),
-                        old_level=old_f.level.value,
-                    ))
-                else:
-                    # 有同类新证据但规则不再触发 → 已解决
-                    comparisons.append(VersionDiffComparison(
-                        old_finding_id=old_f.finding_id,
-                        identity=ident,
-                        status=VersionDiffStatus.RESOLVED,
-                        reason=(
-                            f"修改后提供了新的{'; '.join(ev_cats) or '证据'},"
-                            f"该问题不再触发。"
-                        ),
-                        old_level=old_f.level.value,
-                    ))
-            else:
-                # 身份匹配:仍存在或缓解
+            matches = new_groups.get(key(old_f), [])
+            status, reason, new_f = VersionDiffStatus.INSUFFICIENT_EVIDENCE, "", None
+            if len(old_groups[key(old_f)]) > 1 or len(matches) > 1:
+                matched_new_ids.update(f.finding_id for f in matches)
+                reason = "同规则、主张与作用范围中有多个条目，无法唯一配对；未将任何旧项自动判为已解决。"
+            elif matches:
                 new_f = matches[0]
                 matched_new_ids.add(new_f.finding_id)
-                old_sev = _SEVERITY_ORDER[old_f.level]
-                new_sev = _SEVERITY_ORDER[new_f.level]
-
-                if new_sev < old_sev:
-                    comparisons.append(VersionDiffComparison(
-                        old_finding_id=old_f.finding_id,
-                        identity=ident,
-                        status=VersionDiffStatus.MITIGATED,
-                        reason=(
-                            f"问题仍然存在,但严重度从{old_f.level.value}"
-                            f"降为{new_f.level.value}。"
-                        ),
-                        old_level=old_f.level.value,
-                        new_level=new_f.level.value,
-                        new_finding_id=new_f.finding_id,
-                    ))
+                if new_f.level == FindingLevel.INSUFFICIENT and old_f.level != FindingLevel.INSUFFICIENT:
+                    reason = "当前仍缺证据，无法把严重度降低解释为问题已缓解。" + new_f.title
+                elif _SEVERITY_ORDER[new_f.level] < _SEVERITY_ORDER[old_f.level]:
+                    status = VersionDiffStatus.MITIGATED
+                    reason = "这项问题仍需处理，但相关风险已缓解：" + new_f.title
                 else:
-                    comparisons.append(VersionDiffComparison(
-                        old_finding_id=old_f.finding_id,
-                        identity=ident,
-                        status=VersionDiffStatus.PERSISTS,
-                        reason=(
-                            f"修改后该问题仍然存在(严重度:{new_f.level.value})。"
-                            if new_sev == old_sev
-                            else f"问题未解决,严重度反而从{old_f.level.value}升为{new_f.level.value}。"
-                        ),
-                        old_level=old_f.level.value,
-                        new_level=new_f.level.value,
-                        new_finding_id=new_f.finding_id,
-                    ))
+                    status = VersionDiffStatus.PERSISTS
+                    reason = "这项问题仍存在：" + new_f.title + "。补充材料不等于问题已解决。"
+            else:
+                status, reason = self._resolution_status(old_f, old_report, new_report)
+            comparisons.append(VersionDiffComparison(
+                old_finding_id=old_f.finding_id, identity=ident, status=status, reason=reason,
+                old_level=old_f.level.value, new_level=new_f.level.value if new_f else "",
+                new_finding_id=new_f.finding_id if new_f else ""))
 
-        # 新问题:新报告中有、旧报告中无此身份
-        new_issue_ids: list[str] = []
-        old_identities = {
-            self.compute_identity(f).identity_hash for f in old_report.findings
-        }
+        new_issue_ids = []
         for new_f in new_report.findings:
             if new_f.finding_id in matched_new_ids:
                 continue
-            ident = self.compute_identity(new_f)
-            if ident.identity_hash in old_identities:
-                continue
-            comp = VersionDiffComparison(
-                identity=ident,
-                status=VersionDiffStatus.NEW_ISSUE,
-                reason=f"新发现的问题:{new_f.title}",
-                new_level=new_f.level.value,
-                new_finding_id=new_f.finding_id,
-            )
+            comp = VersionDiffComparison(identity=self.compute_identity(new_f),
+                status=VersionDiffStatus.NEW_ISSUE, reason="新发现的问题：" + new_f.title,
+                new_level=new_f.level.value, new_finding_id=new_f.finding_id)
             comparisons.append(comp)
             new_issue_ids.append(comp.comparison_id)
 
@@ -204,6 +139,42 @@ class VersionDiffService:
             revision_alignment=alignment,
             created_at=datetime.now().isoformat(),
         )
+
+    @staticmethod
+    def _snapshot_values(report):
+        values = {}
+        material = {d["material_id"]: d for d in report.material_snapshot}
+        for fact in report.fact_snapshot:
+            doc = material.get(fact.source.material_id, {})
+            value = fact.effective_value()
+            try:
+                import json
+                value = json.dumps(json.loads(value), ensure_ascii=False, sort_keys=True)
+            except (ValueError, TypeError):
+                value = " ".join(value.split())
+            provenance = "/".join(str(doc.get(k, "unknown")) for k in ("role", "origin", "kind"))
+            values.setdefault(fact.category.value, set()).add(f"[{provenance}] {value}")
+        values["claim_scope"] = {f"{cid}: {text}" for cid, text in report.claim_snapshot.items()}
+        return values
+
+    def _resolution_status(self, finding, old, new):
+        unknown = VersionDiffStatus.INSUFFICIENT_EVIDENCE
+        if not old.snapshot_version or not new.snapshot_version:
+            return unknown, "旧版报告缺少完整事实快照，无法确认问题已解决。请以当前报告建立新基准。"
+        if finding.rule_id not in new.checked_rule_ids or finding.rule_id in new.failed_rule_ids:
+            return unknown, "对应规则未完成本次审查，不能将未触发解释为已解决。"
+        if any(old.claim_snapshot.get(cid) != new.claim_snapshot.get(cid) for cid in finding.claim_ids):
+            return unknown, "相关主张已修改或移除，需要核对新的范围；不能自动视为原实验问题已修复。"
+        if finding.issue_scope and finding.issue_scope not in ("comparison", "stability"):
+            return unknown, "缺少该作用范围的独立通过记录，无法用其他数据集或比较对象的变化解除此项。"
+        required = {ref.category.value for ref in finding.evidence}
+        if not required:
+            required = {"data_split"} if "split" in finding.rule_id or "generalization" in finding.rule_id else (
+                {"baseline"} if "baseline" in finding.rule_id else {"repetition"} if "repetition" in finding.rule_id else {"metric"})
+        before, after = self._snapshot_values(old), self._snapshot_values(new)
+        if not any(after.get(cat) and after.get(cat) != before.get(cat) for cat in required):
+            return unknown, "原发现已不再出现，但没有核对到相关已确认事实的实际变化；删除、拒绝或待确认材料不构成修复。"
+        return VersionDiffStatus.RESOLVED, "相关已确认事实发生变化，且对应规则已完成并不再触发；仅表示此规则下的问题解除，不为整个实验背书。"
 
     # ---- 修改理由对照 ----
 
@@ -229,25 +200,25 @@ class VersionDiffService:
                 claimed_cats.add(cat)
                 claimed_changes.append(f"声称修改了{cat}(关键词:{kw})")
 
-        # 2. 事实层面实际变化:旧报告证据值 vs 当前事实值
-        actual_changes: list[FactChange] = []
-        changed_cats: set[str] = set()
-        old_by_cat: dict[str, list[str]] = {}
-        for f in old_report.findings:
-            for ref in f.evidence:
-                old_by_cat.setdefault(ref.category.value, []).append(ref.value)
-
-        current_by_cat: dict[str, list[str]] = {}
-        for fact in store.facts.values():
-            if fact.is_usable():
-                current_by_cat.setdefault(fact.category.value, []).append(
-                    fact.effective_value()
-                )
+        # 使用完整、不可变的报告快照；不能用“报告恰好引用了什么”还原旧事实。
+        if not old_report.snapshot_version:
+            return RevisionAlignment(revision_note=revision_note, claimed_changes=claimed_changes,
+                alignment=RevisionAlignmentLevel.UNKNOWN,
+                alignment_detail="旧报告没有完整事实快照，无法核对所声称的修改；请先建立新基准。")
+        from app.models.review import ReviewReport
+        current = ReviewReport(session_id=store.session.session_id, snapshot_version=1,
+            fact_snapshot=[f.model_copy(deep=True) for f in store.usable_facts()],
+            claim_snapshot={c.claim_id: c.text for c in store.session.claims},
+            material_snapshot=[{"material_id": d.material_id, "role": d.role.value,
+                "kind": d.kind.value, "origin": d.origin} for d in store.docs.values()])
+        old_by_cat = self._snapshot_values(old_report)
+        current_by_cat = self._snapshot_values(current)
+        actual_changes, changed_cats = [], set()
 
         all_cats = set(old_by_cat.keys()) | set(current_by_cat.keys())
         for cat in sorted(all_cats):
-            old_vals = old_by_cat.get(cat, [])
-            new_vals = current_by_cat.get(cat, [])
+            old_vals = sorted(old_by_cat.get(cat, set()))
+            new_vals = sorted(current_by_cat.get(cat, set()))
             if not old_vals and new_vals:
                 actual_changes.append(FactChange(
                     category=cat, new_value="; ".join(new_vals[:3]),
@@ -277,7 +248,7 @@ class VersionDiffService:
             alignment = RevisionAlignmentLevel.ALIGNED
             detail = (
                 f"声称改动({'; '.join(sorted(claimed_cats))})与事实层面实际变化"
-                f"({'; '.join(sorted(changed_cats))})一致。"
+                f"({'; '.join(sorted(changed_cats))})有对应变化；仅核对类别，不证明修改方向正确或问题已解决。"
             )
         elif claimed_cats & changed_cats:
             alignment = RevisionAlignmentLevel.PARTIALLY_ALIGNED
@@ -292,7 +263,7 @@ class VersionDiffService:
             detail = (
                 f"不一致:声称改动({'; '.join(sorted(claimed_cats))})"
                 f"在事实层面均未发生变化(实际变化:{'; '.join(sorted(changed_cats)) or '无'})。"
-                f"请确认是否真正修改了实验,还是仅修改了描述。"
+                "这里只核对已确认事实；请补充对应代码或记录，不能据此断言完整实验没有修改。"
             )
 
         return RevisionAlignment(

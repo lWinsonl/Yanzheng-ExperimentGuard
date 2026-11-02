@@ -1,7 +1,7 @@
 // 与后端 app/models 对应的类型定义
 
 export type MaterialRole = 'plan' | 'execution'
-export type MaterialKind = 'text' | 'code' | 'config' | 'result' | 'pdf'
+export type MaterialKind = 'text' | 'code' | 'config' | 'result' | 'pdf' | 'docx' | 'xlsx'
 export type FactCategory =
   | 'comparison_target'
   | 'data_split'
@@ -461,7 +461,7 @@ export type VersionDiffStatus =
   | 'new_issue'
   | 'insufficient_evidence'
 
-export type RevisionAlignmentLevel = 'aligned' | 'partially_aligned' | 'not_aligned'
+export type RevisionAlignmentLevel = 'aligned' | 'partially_aligned' | 'not_aligned' | 'unknown'
 
 /** 发现稳定身份 */
 export interface FindingIdentity {
@@ -587,13 +587,15 @@ export const VDIFF_STATUS_COLORS: Record<VersionDiffStatus, string> = {
 }
 
 export const ALIGNMENT_LABELS: Record<RevisionAlignmentLevel, string> = {
-  aligned: '一致',
-  partially_aligned: '部分一致',
-  not_aligned: '不一致',
+  aligned: '相关类别有变化',
+  partially_aligned: '部分可核对',
+  not_aligned: '未核对到声称的变化',
+  unknown: '缺少基准，无法核对',
 }
 
 export const ALIGNMENT_COLORS: Record<RevisionAlignmentLevel, string> = {
   aligned: '#1e8e3e',
   partially_aligned: '#e37400',
   not_aligned: '#d93025',
+  unknown: '#5f6368',
 }

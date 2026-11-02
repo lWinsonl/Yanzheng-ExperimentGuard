@@ -89,6 +89,16 @@ class RuleExtractor(ExtractorBase):
     def extract(self, doc: ParsedDocument, session_id: str) -> Iterable[ExtractedFact]:
         from app.models.evidence import SourceSpan
         from app.services.evidence_checks import entity_sets
+        from app.services.numeric_evidence import parsed_records
+
+        kinds = {kind for kind, _ in parsed_records(doc.content)}
+        for kind in sorted(kinds):
+            yield self.make_fact(session_id=session_id,
+                category=FactCategory.METRIC if kind == "comparison" else FactCategory.REPETITION,
+                value=doc.content.strip(),
+                source=SourceSpan(material_id=doc.material_id, start_char=0,
+                                  end_char=len(doc.content), snippet=doc.content),
+                note="完整数值记录，包含方法、指标和条件；确认后才核对，数字与同条件声明仍需结合来源验证。")
 
         if entity_sets(doc.content):
             yield self.make_fact(

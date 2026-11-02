@@ -113,7 +113,7 @@ def test_clean_case_no_false_positive():
     )
     # 正确案例应包含执行侧的基线记录，而不只有计划承诺。
     evidence_chain.extract_from_text(session.session_id,
-        "baseline_B,F1=0.75", "baseline-results.txt", "execution")
+        "F1=0.87 ± 0.02 (5 runs)\nbaseline_B,F1=0.75", "baseline-results.log", "execution")
     _confirm_all(session.session_id)
     report = review_service.run_review(session.session_id)
 
@@ -256,7 +256,7 @@ def test_as_stability_seed_only_risk():
     evidence_chain.extract_from_text(
         session.session_id,
         "np.random.seed(42)\nlatency_a = 12.3\nlatency_b = 15.6\n",
-        "bench.py",
+        "bench.log",
         "execution",
     )
     _confirm_all(session.session_id)
@@ -281,7 +281,7 @@ def test_as_clean_case_no_false_positive():
         "baseline = FIFO()\n"
         "latency_a = 12.3 ± 0.8\nlatency_b = 15.6 ± 1.2\n"
         "n_runs = 5\n",
-        "bench.py",
+        "bench.log",
         "execution",
     )
     _confirm_all(session.session_id)

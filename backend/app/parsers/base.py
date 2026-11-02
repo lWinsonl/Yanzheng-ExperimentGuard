@@ -25,6 +25,16 @@ EXT_KIND_MAP: dict[str, MaterialKind] = {
     ".go": MaterialKind.CODE,
     ".rs": MaterialKind.CODE,
     ".sh": MaterialKind.CODE,
+    ".c": MaterialKind.CODE,
+    ".cpp": MaterialKind.CODE,
+    ".h": MaterialKind.CODE,
+    ".hpp": MaterialKind.CODE,
+    ".cs": MaterialKind.CODE,
+    ".sql": MaterialKind.CODE,
+    ".r": MaterialKind.CODE,
+    ".rb": MaterialKind.CODE,
+    ".kt": MaterialKind.CODE,
+    ".swift": MaterialKind.CODE,
     ".json": MaterialKind.CONFIG,
     ".yaml": MaterialKind.CONFIG,
     ".yml": MaterialKind.CONFIG,
@@ -33,6 +43,8 @@ EXT_KIND_MAP: dict[str, MaterialKind] = {
     ".csv": MaterialKind.RESULT,
     ".log": MaterialKind.RESULT,
     ".pdf": MaterialKind.PDF,
+    ".docx": MaterialKind.DOCX,
+    ".xlsx": MaterialKind.XLSX,
 }
 
 
@@ -80,6 +92,9 @@ class ParserBase:
 
 def get_parser(kind: MaterialKind) -> ParserBase:
     """根据材料类型选择解析器。延迟导入避免可选依赖缺失时崩溃。"""
+    if kind in (MaterialKind.DOCX, MaterialKind.XLSX):
+        from app.parsers.office_parser import OfficeParser
+        return OfficeParser()
     if kind == MaterialKind.PDF:
         from app.parsers.pdf_parser import PdfParser
 

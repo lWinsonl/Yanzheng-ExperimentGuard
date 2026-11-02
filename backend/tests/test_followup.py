@@ -135,7 +135,7 @@ def _setup_session_with_findings():
     sid = session.session_id
     evidence_chain.extract_from_text(sid, PLAN_OK, "plan.txt", "plan")
     evidence_chain.extract_from_text(sid, EXEC_LEAKY, "exec.py", "execution")
-    evidence_chain.extract_from_text(sid, RESULT_OK, "results.csv", "result")
+    evidence_chain.extract_from_text(sid, RESULT_OK, "results.csv", "execution")
 
     store = data_store.require(sid)
     for f in list(store.facts.values()):

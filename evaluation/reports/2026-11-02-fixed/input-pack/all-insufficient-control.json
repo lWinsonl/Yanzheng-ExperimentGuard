@@ -1,0 +1,103 @@
+{
+  "condition": "all_insufficient_sanity_control_NOT_A_MODEL",
+  "run_id": "sanity-r1",
+  "dataset_sha256": "79fdf95c0504aa06b90b4c2d0db6f9f5d45ff995d049dd4247e3ff0582b073c2",
+  "predictions": [
+    {
+      "case_id": "T01",
+      "prediction": "insufficient"
+    },
+    {
+      "case_id": "T04",
+      "prediction": "insufficient"
+    },
+    {
+      "case_id": "S01",
+      "prediction": "insufficient"
+    },
+    {
+      "case_id": "C07",
+      "prediction": "insufficient"
+    },
+    {
+      "case_id": "C03",
+      "prediction": "insufficient"
+    },
+    {
+      "case_id": "C04",
+      "prediction": "insufficient"
+    },
+    {
+      "case_id": "S05",
+      "prediction": "insufficient"
+    },
+    {
+      "case_id": "T02",
+      "prediction": "insufficient"
+    },
+    {
+      "case_id": "T07",
+      "prediction": "insufficient"
+    },
+    {
+      "case_id": "T08",
+      "prediction": "insufficient"
+    },
+    {
+      "case_id": "S08",
+      "prediction": "insufficient"
+    },
+    {
+      "case_id": "C02",
+      "prediction": "insufficient"
+    },
+    {
+      "case_id": "C01",
+      "prediction": "insufficient"
+    },
+    {
+      "case_id": "C08",
+      "prediction": "insufficient"
+    },
+    {
+      "case_id": "T06",
+      "prediction": "insufficient"
+    },
+    {
+      "case_id": "S07",
+      "prediction": "insufficient"
+    },
+    {
+      "case_id": "S02",
+      "prediction": "insufficient"
+    },
+    {
+      "case_id": "C06",
+      "prediction": "insufficient"
+    },
+    {
+      "case_id": "S04",
+      "prediction": "insufficient"
+    },
+    {
+      "case_id": "S06",
+      "prediction": "insufficient"
+    },
+    {
+      "case_id": "T05",
+      "prediction": "insufficient"
+    },
+    {
+      "case_id": "C05",
+      "prediction": "insufficient"
+    },
+    {
+      "case_id": "S03",
+      "prediction": "insufficient"
+    },
+    {
+      "case_id": "T03",
+      "prediction": "insufficient"
+    }
+  ]
+}

@@ -93,7 +93,7 @@ class ClaimGraphService:
         old_graph = store.claim_graph
 
         usable = store.usable_facts()
-        graph = ClaimGraph(session_id=session_id, rule_version=2, created_at=datetime.now().isoformat())
+        graph = ClaimGraph(session_id=session_id, rule_version=3, created_at=datetime.now().isoformat())
 
         # 1. 拆解子主张
         for claim in session.claims:
@@ -125,7 +125,7 @@ class ClaimGraphService:
 
     def get_graph(self, session_id: str) -> ClaimGraph | None:
         store = data_store.get(session_id)
-        if store and store.claim_graph and store.claim_graph.rule_version < 2:
+        if store and store.claim_graph and store.claim_graph.rule_version < 3:
             return self.build_graph(session_id)
         return store.claim_graph if store else None
 
@@ -312,7 +312,23 @@ class ClaimGraphService:
 
     def _edges_for_comparison(self, sc: SubClaim, by_cat: dict[FactCategory, list[ExtractedFact]]) -> list[ClaimEvidenceEdge]:
         facts = by_cat.get(FactCategory.METRIC, []) + by_cat.get(FactCategory.BASELINE, [])
-        return self._related_edges(sc, facts, "发现指标或基线材料；尚未自动核对双方数值、指标方向及相同评价条件，不能据此认定优于基线。")
+        return self._observation_edges(sc, facts, "comparison",
+            "仅发现相关材料；需完整的方法、指标方向、双方数值与相同测试条件，才能核对限定表中的比较。")
+
+    def _observation_edges(self, sc, facts, aspect, fallback):
+        from app.services.numeric_evidence import evaluate_fact
+        edges = []
+        for fact in facts:
+            store = data_store.require(fact.session_id)
+            claim = next((c.text for c in store.session.claims if c.claim_id == sc.claim_id), "")
+            result = evaluate_fact(fact, store.docs, aspect, claim)
+            if result is None:
+                edges.extend(self._related_edges(sc, [fact], fallback))
+            else:
+                relation, basis = result
+                edges.append(ClaimEvidenceEdge(sub_claim_id=sc.sub_claim_id, fact_id=fact.fact_id,
+                    relation=EdgeRelation(relation), basis=basis, direction=EvidenceDirection.RESULT))
+        return edges or self._related_edges(sc, [], fallback)
 
     @staticmethod
     def _related_edges(sc, facts, basis):
@@ -326,7 +342,8 @@ class ClaimGraphService:
         )]
 
     def _edges_for_stability(self, sc: SubClaim, rep_facts: list[ExtractedFact]) -> list[ClaimEvidenceEdge]:
-        return self._related_edges(sc, rep_facts, "重复次数、种子或波动数据是相关线索；还需核对各方法的实际重复结果与条件，才能判断是否更稳定。")
+        return self._observation_edges(sc, rep_facts, "stability",
+            "重复次数、种子或单项波动仅为线索；需明确双方同条件样本标准差和有限运行范围，才能作样本内比较。")
 
     def _edges_for_baseline_fairness(self, sc: SubClaim, baseline_facts: list[ExtractedFact]) -> list[ClaimEvidenceEdge]:
         return self._related_edges(sc, baseline_facts, "存在基线相关材料；尚未核对划分、指标、预处理与预算是否一致，比较公平性待核实。")

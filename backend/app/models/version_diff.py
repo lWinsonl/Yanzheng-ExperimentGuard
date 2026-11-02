@@ -37,6 +37,7 @@ class RevisionAlignmentLevel(str, Enum):
     ALIGNED = "aligned"              # 理由与实际变化一致
     PARTIALLY_ALIGNED = "partially_aligned"  # 部分一致
     NOT_ALIGNED = "not_aligned"      # 不一致(声称改了但实际没变,或反之)
+    UNKNOWN = "unknown"              # 缺少旧版快照，无法核对
 
 
 class MigrationScoreDimension(str, Enum):
@@ -65,6 +66,7 @@ class FindingIdentity(BaseModel):
     """证据范围:涉及的 FactCategory 值集合(如 data_split+metric)。"""
 
     problem_category: str = ""
+    issue_scope: str | None = None
     """问题类别:从 rule_id 推断的问题类型(如 split_inconsistency)。"""
 
     @staticmethod
@@ -73,12 +75,13 @@ class FindingIdentity(BaseModel):
         claim_ids: list[str],
         evidence_categories: list[str],
         problem_category: str = "",
+        issue_scope: str | None = None,
     ) -> "FindingIdentity":
         """确定性计算身份哈希:组件排序后拼接,SHA-256 取前16位。"""
         raw = "|".join([
             rule_id,
             ",".join(sorted(claim_ids)),
-            ",".join(sorted(evidence_categories)),
+            ",".join(sorted(evidence_categories)) if issue_scope is None else issue_scope,
             problem_category or rule_id,
         ])
         h = hashlib.sha256(raw.encode("utf-8")).hexdigest()[:16]
@@ -88,6 +91,7 @@ class FindingIdentity(BaseModel):
             claim_ids=sorted(claim_ids),
             evidence_categories=sorted(evidence_categories),
             problem_category=problem_category or rule_id,
+            issue_scope=issue_scope,
         )
 
 

@@ -1,0 +1,23 @@
+
+> frontend@0.0.0 test:e2e
+> playwright test
+
+
+Running 9 tests using 1 worker
+
+  ok 1 [desktop] › e2e\workflow.spec.ts:7:1 › create, upload, confirm, answer, revise, practice and refresh (2.0s)
+  ok 2 [desktop] › e2e\workflow.spec.ts:64:1 › invalid persisted step recovers to a usable page (389ms)
+  ok 3 [desktop] › e2e\workflow.spec.ts:74:1 › upload failure keeps existing materials and retry remains usable (759ms)
+  ok 4 [mobile] › e2e\workflow.spec.ts:7:1 › create, upload, confirm, answer, revise, practice and refresh (1.8s)
+  ok 5 [mobile] › e2e\workflow.spec.ts:64:1 › invalid persisted step recovers to a usable page (383ms)
+  ok 6 [mobile] › e2e\workflow.spec.ts:74:1 › upload failure keeps existing materials and retry remains usable (714ms)
+  ok 7 [tablet] › e2e\workflow.spec.ts:7:1 › create, upload, confirm, answer, revise, practice and refresh (1.9s)
+  ok 8 [tablet] › e2e\workflow.spec.ts:64:1 › invalid persisted step recovers to a usable page (405ms)
+  ok 9 [tablet] › e2e\workflow.spec.ts:74:1 › upload failure keeps existing materials and retry remains usable (749ms)
+
+  9 passed (14.3s)
+
+[WebServer] INFO:     Started server process [51248]
+[WebServer] INFO:     Waiting for application startup.
+[WebServer] INFO:     Application startup complete.
+[WebServer] INFO:     Uvicorn running on http://127.0.0.1:18083 (Press CTRL+C to quit)

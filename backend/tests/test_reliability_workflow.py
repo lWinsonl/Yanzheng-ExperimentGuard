@@ -243,5 +243,5 @@ def test_old_rule_graph_is_rebuilt_before_display():
     for edge in graph.edges:
         edge.relation = EdgeRelation.SUPPORTS
     rebuilt = claim_graph_service.get_graph(sid)
-    assert rebuilt.rule_version == 2
+    assert rebuilt.rule_version >= 3
     assert all(edge.relation == EdgeRelation.UNKNOWN for edge in rebuilt.edges)

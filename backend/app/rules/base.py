@@ -91,4 +91,5 @@ def get_rules_for(experiment_type: ExperimentType) -> list[RuleBase]:
         StabilityRepetitionRule(),
         PlanExecutionCoverageRule(),
     ]
-    return [r for r in all_rules if r.experiment_type == experiment_type]
+    from app.rules.numeric_rules import NumericComparisonRule, NumericStabilityRule
+    return [r for r in all_rules if r.experiment_type == experiment_type] + [NumericComparisonRule(), NumericStabilityRule()]

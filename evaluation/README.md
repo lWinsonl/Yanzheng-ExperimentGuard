@@ -1,6 +1,6 @@
 # 可重复的系统测试与评测工具
 
-该目录提供离线执行工具和公开合成开发集。完整方案见 [评测协议](../docs/evaluation/plan.md)，当前实测见 [2026-11-02报告](reports/2026-11-02/summary.md)。
+该目录提供离线执行工具和公开合成开发集。完整方案见[评测协议](../docs/evaluation/plan.md)，当前见[修复后报告](reports/2026-11-02-fixed/summary.md)，[历史基线](reports/2026-11-02/summary.md)保留修复前结果。
 
 ## 安装与执行
 
@@ -14,13 +14,21 @@ python -m evaluation.run
 
 运行器显式清空子进程中的模型配置，使用临时数据目录。它不改 `.env`、不调用生产站点、不调用模型服务。不要绕过这些设置来运行带真实DATA_DIR的测试。
 
-默认结果放到 `evaluation/runs/时间/`，此目录被Git忽略。输出包括 `summary.md`、`results.json`、JUnit、日志、盲化输入包与评分自检。**默认退出码0只表示执行阶段成功；已知缺陷与能力空白仍在报告中。**
+默认结果放到 `evaluation/runs/时间/`，此目录被Git忽略。输出包括 `summary.md`、`results.json`、JUnit、日志、盲化输入包与评分自检。默认退出码0表示执行阶段成功；不能代替真实材料和教学效果验收。
 
 ```text
 python -m evaluation.run --release-gate
 ```
 
-门槛模式在存在已知未修缺陷时返回2。当前结果为120通过、5严格XFAIL；单独的 `known-defects-audit` 使用 `--runxfail` 真实暴露5个断言失败，退出码1为已发现缺陷，不是通过。修复后要移除相应失败标记并更新报告。
+门槛模式在执行失败、已知缺陷回归失败或评分自检失败时返回2。原5项缺陷已移除 XFAIL 并转为普通断言；`known-defects-audit` 额外要求这些断言正常通过，不再将失败当作预期结果。
+
+附加真实浏览器检查（先构建前端，运行器默认会构建）：
+
+```text
+python -m evaluation.run --release-gate --browser
+```
+
+安装开发依赖后，Windows 自动寻找本机 Chrome/Edge；也可设置 `YANZHENG_TEST_BROWSER` 为浏览器可执行文件。其他环境可在 frontend 目录运行 `npx playwright install chromium` 安装测试浏览器。测试用独立上下文和本机临时后端，三种宽度共9项用例，不使用个人浏览器配置。原始截图、追踪和浏览器报告默认忽略，发布时只保留无敏感材料的摘要。
 
 如果已验证前端构建，只想复跑后端与能力诊断：
 
@@ -71,6 +79,6 @@ python -m evaluation.score --dataset evaluation/cases.json --predictions evaluat
 
 - `metrics.py`：三态混淆矩阵、宏F1、判断覆盖率、确定判断正确率、κ、Wilson与项目配对bootstrap。无分母返回null；合成案例默认不生成总体置信区间。
 - `templates/`：材料与教师标注CSV、漏洞匹配、追问事件、匿名学生评分、基线提示词和冻结记录。
-- `reports/2026-11-02/`：经过检查的合成测试结果。这里只发布无真实材料的结果。
+- `reports/2026-11-02/`：原始失败基线；`reports/2026-11-02-fixed/`：修复后结果。这里只发布合成材料的结果，不改写旧报告。
 
-真实材料、学生身份、模型密钥与供应商原始敏感响应不得提交公开仓库。供应商实际429、超时、模型语义判断、浏览器验收与教学效果尚未由本轮离线结果验证。
+真实材料、学生身份、模型密钥与供应商敏感响应不得提交公开仓库。本地浏览器覆盖范围见摘要；供应商实际429、超时、模型语义判断、线上冷启动、完整人工浏览器验收与教学效果仍待验证。

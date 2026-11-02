@@ -1,0 +1,2 @@
+task_type,main_method,baseline_method,metric,better,main_value,baseline_value,test_split,hardware,preprocessing,budget
+comparison,A,B,F1,higher,,,,,,

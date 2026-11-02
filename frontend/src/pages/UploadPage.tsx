@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import type { GapAnalysis, IngestResponse, MaterialMeta, MaterialRole } from '../types'
 import { addTextMaterial, analyzeGaps, listMaterials, uploadFile } from '../api'
 import { DEMO_EXECUTION, DEMO_PLAN } from '../demo-data'
@@ -35,6 +35,7 @@ function UploadArea({
   const fileRef = useRef<HTMLInputElement>(null)
 
   async function handleUpload(file: File) {
+    if (file.size > 5 * 1024 * 1024) { setError('单个文件不能超过5 MB'); return }
     setBusy(true)
     setError('')
     try {
@@ -108,10 +109,18 @@ function UploadArea({
               checked={uploadMode === 'replace'}
               onChange={() => setUploadMode('replace')}
             />
-            替换旧版本(清除旧材料及其事实,再上传)
+            替换旧版本(新材料解析成功后归档旧材料)
           </label>
         </div>
       )}
+
+      {!isPlan && <details className="workflow-details">
+        <summary>提供可自动核对的结果表</summary>
+        <p>填入本次真实结果。只有核对过条件确实相同时才填写 same；缺项会继续提示需要核实。</p>
+        <p><a href="/templates/comparison.csv" download>下载比较结果表</a>　
+          <a href="/templates/stability.csv" download>下载重复运行结果表</a></p>
+        <p className="muted">自动核对只涉及所提供的点估计或有限运行的样本标准差，不代替显著性与总体泛化检验。</p>
+      </details>}
 
       <div className="upload-actions">
         <button disabled={busy} onClick={() => fileRef.current?.click()}>
@@ -126,6 +135,7 @@ function UploadArea({
         <input
           ref={fileRef}
           type="file"
+          accept=".txt,.md,.markdown,.py,.ipynb,.js,.ts,.java,.go,.rs,.sh,.c,.cpp,.h,.hpp,.cs,.sql,.r,.rb,.kt,.swift,.json,.yaml,.yml,.toml,.ini,.csv,.log,.pdf,.docx,.xlsx"
           hidden
           onChange={(e) => {
             const f = e.target.files?.[0]
@@ -167,13 +177,13 @@ function UploadArea({
           </h4>
           {lastResult.ocr_required && (
             <div className="warn">
-              OCR 缺口:{lastResult.ocr_note || '该材料含未提取内容,需 OCR。'}
+              解析缺口:{lastResult.ocr_note || '该材料含未提取内容,需 OCR。'}
             </div>
           )}
           <div>提取到 {lastResult.extracted_facts.length} 条待确认事实</div>
           {lastResult.dropped.length > 0 && (
             <div className="warn">
-              {lastResult.dropped.length} 条提取结果因引用校验失败被丢弃(防幻觉)
+              <ul>{lastResult.dropped.map((reason, i) => <li key={i}>{reason}</li>)}</ul>
             </div>
           )}
         </div>
@@ -189,22 +199,25 @@ export function UploadPage({ sessionId, onNext, onBack }: Props) {
   const [materials, setMaterials] = useState<MaterialMeta[]>([])
   const [gaps, setGaps] = useState<GapAnalysis | null>(null)
 
-  useEffect(() => {
-    refresh()
-  }, [])
+  const refresh = useCallback(async () => {
+    const value = await listMaterials(sessionId)
+    setMaterials(value)
+    return value
+  }, [sessionId])
 
-  /** 材料变化时自动刷新缺口分析 */
   useEffect(() => {
-    analyzeGaps(sessionId).then(setGaps).catch(() => {})
-  }, [sessionId, materials.length])
+    let active = true
+    listMaterials(sessionId).then((value) => { if (active) setMaterials(value) })
+      .catch(() => { /* the upload controls still allow retry */ })
+    return () => { active = false }
+  }, [sessionId])
 
-  async function refresh() {
-    try {
-      setMaterials(await listMaterials(sessionId))
-    } catch {
-      /* 忽略 */
-    }
-  }
+  const materialVersion = materials.map((m) => m.material_id).join(',')
+  useEffect(() => {
+    let active = true
+    analyzeGaps(sessionId).then((value) => { if (active) setGaps(value) }).catch(() => {})
+    return () => { active = false }
+  }, [sessionId, materialVersion])
 
   const planMaterials = materials.filter((m) => m.role === 'plan')
   const execMaterials = materials.filter((m) => m.role === 'execution')
@@ -226,7 +239,7 @@ export function UploadPage({ sessionId, onNext, onBack }: Props) {
       <h2>第二步:收集材料</h2>
       <p className="muted">
         分别上传<strong>实验计划</strong>和<strong>实际执行</strong>材料——
-        两者不一致本身就是重要线索。支持文本、代码、配置、结果文件;PDF 扫描件会标注 OCR 缺口。
+        两者不一致本身就是重要线索。支持文本、代码、CSV、PDF、DOCX和XLSX。图像、公式和扫描内容会明确标出解析缺口。
       </p>
 
       <div className="upload-areas">

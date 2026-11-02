@@ -10,6 +10,10 @@ backend/data/
 # 前端依赖与本地构建产物(阶段1重新构建)
 frontend/node_modules/
 frontend/dist/
+frontend/test-results/
+frontend/playwright-report/
+evaluation/runs/
+evaluation/reports/**/browser/
 
 # 缓存 / 测试 / 文档,镜像不需要
 **/__pycache__/

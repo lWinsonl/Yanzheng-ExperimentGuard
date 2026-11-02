@@ -24,8 +24,11 @@ export function FactConfirmPage({ sessionId, onNext, onBack }: Props) {
   }, [sessionId])
 
   useEffect(() => {
-    refresh()
-  }, [refresh])
+    let active = true
+    listFacts(sessionId).then((items) => { if (active) setFacts(items) })
+      .catch((e) => { if (active) setError(e instanceof Error ? e.message : '加载失败') })
+    return () => { active = false }
+  }, [sessionId])
 
   async function handleConfirm(
     factId: string,

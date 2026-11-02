@@ -28,10 +28,13 @@ class ReviewService:
 
         rules = get_rules_for(session.experiment_type)
         findings: list = []
+        checked, failed = [], []
         for rule in rules:
             try:
                 findings.extend(rule.check(usable, store.docs, claim_texts, claim_ids))
+                checked.append(rule.rule_id)
             except Exception as exc:  # noqa: BLE001
+                failed.append(rule.rule_id)
                 # 单条规则异常不阻断整体审查,但需记录
                 from app.models.review import Finding, FindingLevel
 
@@ -55,6 +58,14 @@ class ReviewService:
             usable_fact_count=len(usable),
             skipped_fact_count=skipped,
             created_at=datetime.now().isoformat(),
+            snapshot_version=1,
+            checked_rule_ids=checked,
+            failed_rule_ids=failed,
+            fact_snapshot=[f.model_copy(deep=True) for f in usable],
+            claim_snapshot={c.claim_id: c.text for c in session.claims},
+            material_snapshot=[{"material_id": d.material_id, "role": d.role.value,
+                                "kind": d.kind.value, "origin": d.origin}
+                               for d in store.docs.values()],
         )
         store.add_report(report)
         if not store.baseline_report_id:

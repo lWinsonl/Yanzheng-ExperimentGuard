@@ -38,6 +38,8 @@ class MaterialKind(str, Enum):
     CONFIG = "config"    # 配置文件
     RESULT = "result"    # 运行结果(日志、CSV、JSON)
     PDF = "pdf"          # PDF 文档(扫描件需 OCR,单独标注)
+    DOCX = "docx"
+    XLSX = "xlsx"
 
 
 class ParsedDocument(BaseModel):

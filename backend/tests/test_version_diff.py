@@ -85,7 +85,7 @@ def _setup_and_review(exec_text=EXEC_LEAKY):
     sid = session.session_id
     evidence_chain.extract_from_text(sid, PLAN_GROUP, "plan.txt", "plan")
     evidence_chain.extract_from_text(sid, exec_text, "exec.py", "execution")
-    evidence_chain.extract_from_text(sid, RESULT_OK, "results.csv", "result")
+    evidence_chain.extract_from_text(sid, RESULT_OK, "results.csv", "execution")
 
     store = data_store.require(sid)
     for f in list(store.facts.values()):

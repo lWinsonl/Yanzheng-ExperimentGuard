@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
 import type {
   VersionDiffComparison,
   VersionDiffResult,
@@ -34,26 +34,18 @@ export function VersionDiffPanel({ sessionId, onResultChange }: Props) {
   const [message, setMessage] = useState('')
   const [labeledIds, setLabeledIds] = useState<Set<string>>(new Set())
 
-  const loadDiff = useCallback(async () => {
-    try {
-      const d = await getLatestVersionDiff(sessionId)
-      setDiff(d)
-      onResultChange?.()
-      setRevisionNote(d.revision_alignment.revision_note)
-    } catch {
-      setDiff(null)
-    }
-    try {
-      const s = await getVersionDiffStats(sessionId)
-      setStats(s)
-    } catch {
-      setStats(null)
-    }
-  }, [sessionId, onResultChange])
-
   useEffect(() => {
-    loadDiff()
-  }, [loadDiff])
+    let active = true
+    getLatestVersionDiff(sessionId).then((d) => {
+      if (!active) return
+      setDiff(d)
+      setRevisionNote((previous) => previous || d.revision_alignment.revision_note)
+      onResultChange?.()
+    }).catch(() => { if (active) setDiff(null) })
+    getVersionDiffStats(sessionId).then((value) => { if (active) setStats(value) })
+      .catch(() => { if (active) setStats(null) })
+    return () => { active = false }
+  }, [sessionId, onResultChange])
 
   const handleRun = async () => {
     setBusy(true)

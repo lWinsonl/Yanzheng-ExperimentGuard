@@ -86,7 +86,7 @@ def list_migration_questions(session_id: str):
 
     try:
         store = data_store.require(session_id)
-        return {"questions": store.migration_questions}
+        return {"questions": store.migration_questions, "answers": store.migration_answers}
     except KeyError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
 

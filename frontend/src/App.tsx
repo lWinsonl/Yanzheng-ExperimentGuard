@@ -23,29 +23,37 @@ const STEP_KEY = 'yanzheng_step'
 function loadSession(): ReviewSession | null {
   try {
     const raw = localStorage.getItem(SESSION_KEY)
-    return raw ? (JSON.parse(raw) as ReviewSession) : null
+    const parsed = raw ? JSON.parse(raw) as ReviewSession : null
+    return parsed && typeof parsed.session_id === 'string' && Array.isArray(parsed.claims)
+      && parsed.claims.every((c) => typeof c.claim_id === 'string' && typeof c.text === 'string') ? parsed : null
   } catch {
     return null
   }
 }
 
 function loadStep(): Step {
-  const raw = localStorage.getItem(STEP_KEY)
-  return (raw as Step) || 'setup'
+  try {
+    const raw = localStorage.getItem(STEP_KEY)
+    return STEPS.some((step) => step.key === raw) ? raw as Step : 'setup'
+  } catch { return 'setup' }
 }
 
 export default function App() {
-  const [step, setStep] = useState<Step>(loadStep)
+  const [step, setStep] = useState<Step>(() => loadSession() ? loadStep() : 'setup')
   const [session, setSession] = useState<ReviewSession | null>(loadSession)
-  const [agentStatus, setAgentStatus] = useState<AgentStatus | null>(null)
+  const [agentResult, setAgentResult] = useState<{ sessionId: string; value: AgentStatus } | null>(null)
+  const sessionId = session?.session_id
+  const agentStatus = agentResult?.sessionId === sessionId ? agentResult?.value : null
 
   // 持久化:session / step 变化时写入 localStorage
   useEffect(() => {
-    if (session) localStorage.setItem(SESSION_KEY, JSON.stringify(session))
-    else localStorage.removeItem(SESSION_KEY)
+    try {
+      if (session) localStorage.setItem(SESSION_KEY, JSON.stringify(session))
+      else localStorage.removeItem(SESSION_KEY)
+    } catch { /* private mode may disable persistence; current in-memory session remains usable */ }
   }, [session])
   useEffect(() => {
-    localStorage.setItem(STEP_KEY, step)
+    try { localStorage.setItem(STEP_KEY, step) } catch { /* keep current session usable */ }
   }, [step])
 
   // 恢复时校验会话在后端是否仍存在,不存在则清空
@@ -58,14 +66,12 @@ export default function App() {
     })
   }, [])
 
-  // 会话变化时获取智能体运行模式(模型/启发式)
   useEffect(() => {
-    if (!session) {
-      setAgentStatus(null)
-      return
-    }
-    getAgentStatus(session.session_id).then(setAgentStatus).catch(() => {})
-  }, [session?.session_id])
+    if (!sessionId) return
+    let active = true
+    getAgentStatus(sessionId).then((value) => { if (active) setAgentResult({ sessionId, value }) }).catch(() => {})
+    return () => { active = false }
+  }, [sessionId])
 
   function startNew() {
     setSession(null)
@@ -114,6 +120,9 @@ export default function App() {
           return (
             <button
               key={s.key}
+              aria-label={`第${i + 1}步：${s.label}`}
+              aria-current={active ? 'step' : undefined}
+              disabled={!reachable}
               className={`step ${active ? 'active' : ''} ${reachable ? '' : 'disabled'}`}
               onClick={() => reachable && go(s.key)}
             >
@@ -136,21 +145,21 @@ export default function App() {
           />
         )}
         {step === 'upload' && session && (
-          <UploadPage
+          <UploadPage key={session.session_id}
             sessionId={session.session_id}
             onBack={() => setStep('setup')}
             onNext={() => setStep('facts')}
           />
         )}
         {step === 'facts' && session && (
-          <FactConfirmPage
+          <FactConfirmPage key={session.session_id}
             sessionId={session.session_id}
             onBack={() => setStep('upload')}
             onNext={() => setStep('report')}
           />
         )}
         {step === 'report' && session && (
-          <ReportPage
+          <ReportPage key={session.session_id}
             sessionId={session.session_id}
             title={session.title}
             claimTexts={claimTexts}
@@ -159,7 +168,7 @@ export default function App() {
           />
         )}
         {step === 'recheck' && session && (
-          <RecheckPage
+          <RecheckPage key={session.session_id}
             sessionId={session.session_id}
             onBack={() => setStep('report')}
             onAddMaterial={() => setStep('upload')}

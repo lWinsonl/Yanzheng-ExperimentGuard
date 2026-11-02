@@ -19,7 +19,13 @@ export function FollowupPanel({ sessionId, onAnswerRecorded }: Props) {
     const [qs, fs] = await Promise.all([listFollowups(sessionId), listFacts(sessionId)])
     setQuestions(qs.questions); setFacts(fs)
   }, [sessionId])
-  useEffect(() => { load().catch((e) => setMessage(String(e))) }, [load])
+  useEffect(() => {
+    let active = true
+    Promise.all([listFollowups(sessionId), listFacts(sessionId)]).then(([qs, fs]) => {
+      if (active) { setQuestions(qs.questions); setFacts(fs) }
+    }).catch((e) => { if (active) setMessage(String(e)) })
+    return () => { active = false }
+  }, [sessionId])
   async function act(action: () => Promise<unknown>) {
     setBusy(true); setMessage('')
     try { await action(); await load() }

@@ -56,8 +56,15 @@ export function ClaimGraphPanel({ sessionId, claimTexts, onGraphChange }: Props)
   }, [sessionId])
 
   useEffect(() => {
-    loadGraph()
-  }, [loadGraph])
+    let active = true
+    Promise.all([getClaimGraph(sessionId), listFacts(sessionId)]).then(([value, items]) => {
+      if (!active) return
+      setGraph(value)
+      setFacts(Object.fromEntries(items.map((fact) => [fact.fact_id, fact])))
+      setExpandedClaims(new Set(value.sub_claims.map((sc) => sc.claim_id)))
+    }).catch(() => { if (active) setGraph(null) })
+    return () => { active = false }
+  }, [sessionId])
 
   // 图变化时通知父组件(用于导出 Markdown)
   useEffect(() => {

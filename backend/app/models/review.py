@@ -13,7 +13,7 @@ from enum import Enum
 
 from pydantic import BaseModel, Field
 
-from app.models.evidence import EvidenceRef, new_id
+from app.models.evidence import EvidenceRef, ExtractedFact, new_id
 
 
 class FindingLevel(str, Enum):
@@ -53,6 +53,9 @@ class Finding(BaseModel):
     reasoning: str = ""
     """规则的推理过程,让学生看懂为什么触发。"""
 
+    issue_scope: str = ""
+    """稳定的问题作用范围，如同一主张下的数据集/比较对象；不包含可变证据类别。"""
+
 
 class ReviewReport(BaseModel):
     """一次审查的完整报告。"""
@@ -67,6 +70,14 @@ class ReviewReport(BaseModel):
     """因未确认或引用校验失败而跳过的事实数。"""
 
     created_at: str = ""
+
+    snapshot_version: int = 0
+    """0表示旧版报告缺少完整快照，不能从发现引用推断全部旧事实。"""
+    fact_snapshot: list[ExtractedFact] = Field(default_factory=list)
+    claim_snapshot: dict[str, str] = Field(default_factory=dict)
+    material_snapshot: list[dict] = Field(default_factory=list)
+    checked_rule_ids: list[str] = Field(default_factory=list)
+    failed_rule_ids: list[str] = Field(default_factory=list)
 
 
 class RecheckComparison(BaseModel):

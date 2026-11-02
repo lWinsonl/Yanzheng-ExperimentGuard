@@ -25,7 +25,7 @@ def agent_status(session_id: str):
         "llm_available": llm_client.is_available(),
         "mode": "llm" if llm_client.is_available() else "heuristic",
         "note": (
-            "已接入大模型,智能体具备语义理解能力"
+            "已配置模型服务；实际连通性和复核结果以具体调用状态为准"
             if llm_client.is_available()
             else "未接入大模型,智能体运行在启发式降级模式。配置 LLM_API_KEY/LLM_BASE_URL/LLM_MODEL 可获得更深入分析。"
         ),

@@ -335,7 +335,7 @@ export function generateMigrationQuestion(
 
 export function listMigrationQuestions(
   sessionId: string,
-): Promise<{ questions: MigrationQuestion[] }> {
+): Promise<{ questions: MigrationQuestion[]; answers: MigrationAnswer[] }> {
   return request(`/sessions/${sessionId}/migration`)
 }
 

@@ -28,7 +28,7 @@ interface Props {
  */
 export function ReportPage({ sessionId, title, claimTexts, onNext, onBack }: Props) {
   const [report, setReport] = useState<ReviewReport | null>(null)
-  const [busy, setBusy] = useState(false)
+  const [busy, setBusy] = useState(true)
   const [error, setError] = useState('')
   const [deepResult, setDeepResult] = useState<DeepReviewResult | null>(null)
   const [graph, setGraph] = useState<ClaimGraph | null>(null)
@@ -54,11 +54,14 @@ export function ReportPage({ sessionId, title, claimTexts, onNext, onBack }: Pro
     }
   }
 
-  // 首次进入报告页时自动运行审查(已有报告时不重复运行)
+  // Initial fetch is asynchronous and guarded against stale/unmounted responses.
   useEffect(() => {
-    if (report) return
-    run()
-  }, [])
+    let active = true
+    runReview(sessionId).then((value) => { if (active) setReport(value) })
+      .catch((e) => { if (active) setError(e instanceof Error ? e.message : '审查失败') })
+      .finally(() => { if (active) setBusy(false) })
+    return () => { active = false }
+  }, [sessionId])
 
   const order: Finding['level'][] = ['contradiction', 'risk', 'insufficient']
   const grouped = (report?.findings ?? []).reduce<Record<string, Finding[]>>((acc, f) => {

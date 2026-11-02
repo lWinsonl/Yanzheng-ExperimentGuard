@@ -30,6 +30,7 @@ class SessionStore:
     def __init__(self, session: ReviewSession):
         self.session = session
         self.docs: dict[str, ParsedDocument] = {}
+        self.archived_docs: dict[str, ParsedDocument] = {}
         self.facts: dict[str, ExtractedFact] = {}
         self.reports: dict[str, ReviewReport] = {}
         self.rechecks: dict[str, RecheckResult] = {}
@@ -39,6 +40,8 @@ class SessionStore:
         self.migration_questions: list[MigrationQuestion] = []
         self.migration_answers: list[MigrationAnswer] = []
         self.manual_labels: list[ManualReviewLabel] = []
+        self.baseline_report_id: str = ""
+        self.owner_id: str = ""
 
     # ---- 事实 ----
     def add_fact(self, fact: ExtractedFact) -> None:
@@ -80,8 +83,12 @@ class DataStore:
                 payload = json.loads(path.read_text(encoding="utf-8"))
                 session = ReviewSession.model_validate(payload["session"])
                 store = SessionStore(session)
+                store.baseline_report_id = payload.get("baseline_report_id", "")
+                store.owner_id = payload.get("owner_id", "")
                 for k, v in payload.get("docs", {}).items():
                     store.docs[k] = ParsedDocument.model_validate(v)
+                for k, v in payload.get("archived_docs", {}).items():
+                    store.archived_docs[k] = ParsedDocument.model_validate(v)
                 for k, v in payload.get("facts", {}).items():
                     store.facts[k] = ExtractedFact.model_validate(v)
                 for k, v in payload.get("reports", {}).items():
@@ -106,6 +113,8 @@ class DataStore:
 
     def create_session(self, session: ReviewSession) -> SessionStore:
         store = SessionStore(session)
+        from app.access import current_owner
+        store.owner_id = current_owner.get()
         self._sessions[session.session_id] = store
         self._persist(store)
         return store
@@ -120,7 +129,9 @@ class DataStore:
         return store
 
     def all_sessions(self) -> list[ReviewSession]:
-        return [s.session for s in self._sessions.values()]
+        from app.access import current_owner
+        owner = current_owner.get()
+        return [s.session for s in self._sessions.values() if s.owner_id == owner]
 
     def persist(self, session_id: str) -> None:
         store = self.get(session_id)
@@ -137,7 +148,10 @@ class DataStore:
         try:
             payload = {
                 "session": store.session.model_dump(),
+                "baseline_report_id": store.baseline_report_id,
+                "owner_id": store.owner_id,
                 "docs": {k: v.model_dump() for k, v in store.docs.items()},
+                "archived_docs": {k: v.model_dump() for k, v in store.archived_docs.items()},
                 "facts": {k: v.model_dump() for k, v in store.facts.items()},
                 "reports": {k: v.model_dump() for k, v in store.reports.items()},
                 "rechecks": {k: v.model_dump() for k, v in store.rechecks.items()},

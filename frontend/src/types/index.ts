@@ -411,6 +411,10 @@ export interface FollowupQuestion {
   answered_at: string
   answer_changed_finding: boolean
   finding_change_detail: string
+  answer_material_id: string
+  answer_fact_ids: string[]
+  baseline_report_id: string
+  review_state: 'not_reviewed' | 'awaiting_confirmation' | 'reviewed'
   created_at: string
 }
 
@@ -530,13 +534,14 @@ export interface MigrationAnswer {
   session_id: string
   answer_text: string
   answered_at: string
-  identifies_core_issue: number
-  explains_why: number
-  proposes_fix: number
-  reasoning_quality: number
-  total_score: number
+  identifies_core_issue: number | null
+  explains_why: number | null
+  proposes_fix: number | null
+  reasoning_quality: number | null
+  total_score: number | null
   feedback: string
   source: string
+  score_status: 'model_feedback' | 'feedback_only' | 'legacy_unverified'
 }
 
 /** 人工复核标签 */

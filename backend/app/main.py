@@ -17,8 +17,10 @@ from fastapi.staticfiles import StaticFiles
 
 from app.api import ALL_ROUTERS
 from app.config import settings
+from app.access import demo_access
 
 app = FastAPI(title=settings.app_name, version="0.1.0")
+app.middleware("http")(demo_access.middleware)
 
 app.add_middleware(
     CORSMiddleware,

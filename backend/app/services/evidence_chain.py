@@ -152,7 +152,7 @@ class EvidenceChainService:
         """便捷方法:直接从文本摄取(前端粘贴内容时使用)。"""
         return self.ingest_material(session_id, text.encode("utf-8"), filename, role_str)
 
-    def clear_materials(self, session_id: str, role_str: str) -> int:
+    def clear_materials(self, session_id: str, role_str: str, keep_material_id: str | None = None) -> int:
         """删除指定角色的所有材料及其关联事实(替换模式上传前调用)。
 
         Returns:
@@ -161,9 +161,9 @@ class EvidenceChainService:
         store = data_store.require(session_id)
         role = MaterialRole(role_str) if role_str in ("plan", "execution") else MaterialRole.PLAN
 
-        to_remove = [mid for mid, d in store.docs.items() if d.role == role]
+        to_remove = [mid for mid, d in store.docs.items() if d.role == role and mid != keep_material_id]
         for mid in to_remove:
-            del store.docs[mid]
+            store.archived_docs[mid] = store.docs.pop(mid)
             if mid in store.session.material_ids:
                 store.session.material_ids.remove(mid)
         # 级联删除该角色材料关联的所有事实

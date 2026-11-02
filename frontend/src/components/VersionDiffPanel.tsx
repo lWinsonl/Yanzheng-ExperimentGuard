@@ -20,12 +20,13 @@ import {
 
 interface Props {
   sessionId: string
+  onResultChange?: () => void
 }
 
 /** 版本差异复审面板:稳定身份配对、五态判定、修改理由对照、人工标签。
  * 核心差异化(P2):同时解决"问题是否真的被修复"和"学生能否把方法迁移到新实验"。
  */
-export function VersionDiffPanel({ sessionId }: Props) {
+export function VersionDiffPanel({ sessionId, onResultChange }: Props) {
   const [diff, setDiff] = useState<VersionDiffResult | null>(null)
   const [stats, setStats] = useState<VersionDiffStats | null>(null)
   const [revisionNote, setRevisionNote] = useState('')
@@ -37,6 +38,8 @@ export function VersionDiffPanel({ sessionId }: Props) {
     try {
       const d = await getLatestVersionDiff(sessionId)
       setDiff(d)
+      onResultChange?.()
+      setRevisionNote(d.revision_alignment.revision_note)
     } catch {
       setDiff(null)
     }
@@ -46,7 +49,7 @@ export function VersionDiffPanel({ sessionId }: Props) {
     } catch {
       setStats(null)
     }
-  }, [sessionId])
+  }, [sessionId, onResultChange])
 
   useEffect(() => {
     loadDiff()
@@ -58,6 +61,7 @@ export function VersionDiffPanel({ sessionId }: Props) {
     try {
       const d = await runVersionDiff(sessionId, revisionNote)
       setDiff(d)
+      onResultChange?.()
       setMessage('版本差异复审完成')
       const s = await getVersionDiffStats(sessionId)
       setStats(s)
@@ -89,8 +93,7 @@ export function VersionDiffPanel({ sessionId }: Props) {
           <h3>版本差异复审</h3>
         </div>
         <p className="panel-desc">
-          修改实验后,重新审查并对比前后报告。系统按稳定身份(规则+主张+证据范围+问题类别)
-          配对发现,判定五态:已解决/缓解/仍存在/新问题/证据不足。
+          修改实验后,重新审查并对比前后报告。系统对比修改前后的发现，说明哪些问题仍在、哪些有变化，以及哪些还缺证据。
         </p>
         <div className="vdiff-run-area">
           <textarea
@@ -131,9 +134,15 @@ export function VersionDiffPanel({ sessionId }: Props) {
     <div className="vdiff-panel">
       <div className="panel-header">
         <h3>版本差异复审</h3>
-        <button className="btn-secondary" onClick={handleRun} disabled={busy}>
+        <button className="btn-secondary" onClick={handleRun} disabled={busy || !revisionNote.trim()}>
           {busy ? '复审中...' : '重新复审'}
         </button>
+      </div>
+
+      <div className="vdiff-run-area">
+        <label htmlFor="revision-note">本轮修改理由</label>
+        <textarea id="revision-note" value={revisionNote} rows={3} disabled={busy}
+          onChange={(e) => setRevisionNote(e.target.value)} placeholder="补充本轮实际修改的内容，再运行复查。" />
       </div>
 
       {/* 修改理由对照 */}

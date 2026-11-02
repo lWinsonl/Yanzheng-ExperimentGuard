@@ -82,11 +82,9 @@ export function MigrationQuiz({ sessionId }: Props) {
       }
       const r = response.answer
       setResult(r)
-      if (r.total_score >= 0.6) {
-        setMessage('恭喜,你的推理过程表明你已掌握该方法要点')
-      } else {
-        setMessage('推理过程还有改进空间,请查看反馈和参考答案')
-      }
+      setMessage(r.score_status === 'model_feedback'
+        ? '已生成本次推理反馈。请核对理由，单次结果不代表已掌握方法。'
+        : '作答已保存，本次未给分。请对照参考思路自查，或请教师复核。')
     } catch (e) {
       setMessage(`提交失败:${e instanceof Error ? e.message : '未知错误'}`)
     } finally {
@@ -114,7 +112,7 @@ export function MigrationQuiz({ sessionId }: Props) {
       <p className="panel-desc">
         基于你实验中发现的问题,生成一个<strong>不同表面情境</strong>但
         <strong>同一方法要点</strong>的新实验场景。评分看的是你的推理过程
-        (是否识别了核心问题、是否解释了为什么、是否提出了修改),而不是只看最终答案。
+        (是否识别了核心问题、是否解释了为什么、是否提出了修改)。模型不可用时提供自查建议，不输出掌握分数。
       </p>
 
       {/* 已有迁移题列表 */}
@@ -178,20 +176,11 @@ export function MigrationQuiz({ sessionId }: Props) {
           {result && (
             <div className="migration-score-card">
               <div className="score-header">
-                <span className="score-total">
-                  总分:{(result.total_score * 100).toFixed(0)} 分
-                </span>
-                <span
-                  className="score-pass-badge"
-                  style={{
-                    color: result.total_score >= 0.6 ? '#1e8e3e' : '#d93025',
-                    borderColor: result.total_score >= 0.6 ? '#1e8e3e' : '#d93025',
-                  }}
-                >
-                  {result.total_score >= 0.6 ? '通过' : '未通过'}
-                </span>
-                <span className="score-source">来源:{result.source}</span>
+                <span className="score-total">{result.score_status === 'model_feedback' && result.total_score != null
+                  ? `本次模型参考分：${(result.total_score * 100).toFixed(0)} 分` : '本次未评分'}</span>
+                <span className="score-source">{result.score_status === 'model_feedback' ? '模型反馈，待核对' : '自查建议'}</span>
               </div>
+              {result.score_status === 'model_feedback' && <>
               <div className="score-dimensions">
                 {(
                   ['identifies_core_issue', 'explains_why', 'proposes_fix', 'reasoning_quality'] as const
@@ -202,18 +191,21 @@ export function MigrationQuiz({ sessionId }: Props) {
                       <div
                         className="dim-bar"
                         style={{
-                          width: `${result[dim] * 100}%`,
+                          width: `${(result[dim] ?? 0) * 100}%`,
                           background:
-                            result[dim] >= 0.6 ? '#1e8e3e' : '#e37400',
+                            (result[dim] ?? 0) >= 0.6 ? '#1e8e3e' : '#e37400',
                         }}
                       />
                     </div>
                     <span className="dim-value">
-                      {(result[dim] * 100).toFixed(0)}
+                      {((result[dim] ?? 0) * 100).toFixed(0)}
                     </span>
                   </div>
                 ))}
               </div>
+              </>}
+              {result.score_status !== 'model_feedback' && <button className="btn-secondary"
+                onClick={() => { setResult(null); setMessage('可修改作答后重新提交，系统将再次尝试获取模型反馈。') }}>编辑或重试</button>}
               {result.feedback && (
                 <div className="score-feedback">{result.feedback}</div>
               )}

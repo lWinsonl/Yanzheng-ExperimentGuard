@@ -310,7 +310,7 @@ class VersionDiffService:
     ) -> VersionDiffResult:
         """版本差异复审:重新审查 → 与上一份报告对比(稳定身份+五态)。"""
         store = data_store.require(session_id)
-        old_report = store.latest_report()
+        old_report = store.reports.get(store.baseline_report_id) or store.latest_report()
         if old_report is None:
             raise ValueError("尚无历史报告,请先完成一次审查再复审。")
 
@@ -319,6 +319,7 @@ class VersionDiffService:
             session_id, old_report, new_report, revision_note
         )
         store.version_diffs.append(result)
+        store.baseline_report_id = new_report.report_id
         data_store.persist(session_id)
         logger.info(
             "版本差异复审完成:resolved=%d mitigated=%d persists=%d new=%d insufficient=%d",
@@ -397,7 +398,8 @@ class VersionDiffService:
         )
 
         # 迁移表现
-        answers = store.migration_answers
+        answers = [a for a in store.migration_answers
+                   if a.score_status == "model_feedback" and a.total_score is not None]
         migration_total = len(answers)
         migration_avg = (
             sum(a.total_score for a in answers) / migration_total

@@ -54,6 +54,9 @@ class ParsedDocument(BaseModel):
     content: str
     """解析出的纯文本内容。PDF 扫描件此处为空或部分,见 ocr_required。"""
 
+    origin: str = "uploaded"
+    """uploaded / followup_answer。回答是用户补充说明,不等同于独立运行记录。"""
+
     ocr_required: bool = False
     """是否需要 OCR/专门解析器。为 True 时 content 不完整,相关事实只能标为
     信息不足,不能假装普通文字提取已覆盖。"""

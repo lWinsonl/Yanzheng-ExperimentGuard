@@ -110,7 +110,7 @@ def test_resolved_when_split_fixed():
     sid = _setup_and_review(EXEC_LEAKY)
     # 确认有矛盾发现
     report = data_store.require(sid).latest_report()
-    assert any(f.level.value == "contradiction" for f in report.findings)
+    assert any(f.level.value == "risk" for f in report.findings)
 
     # 修复:替换为按设备划分
     _replace_exec(sid, EXEC_GOOD)
@@ -250,19 +250,14 @@ def test_migration_answer_scored():
         "应该改为按作者ID分组划分,确保测试集只含训练时未见过的作者。"
     )
     result = agent_service.score_migration_answer(sid, q.question_id, good_answer)
-    assert result["status"] == "ok"
+    assert result["status"] == "feedback_only"
     answer = result["answer"]
-    assert 0 <= answer.identifies_core_issue <= 1
-    assert 0 <= answer.explains_why <= 1
-    assert 0 <= answer.proposes_fix <= 1
-    assert 0 <= answer.reasoning_quality <= 1
-    assert 0 <= answer.total_score <= 1
+    assert answer.total_score is None
+    assert answer.identifies_core_issue is None
+    assert answer.score_status == "feedback_only"
     assert answer.feedback
-
-    # 好回答的 total_score 应该高于差回答
-    bad_answer = "不知道"
-    result_bad = agent_service.score_migration_answer(sid, q.question_id, bad_answer)
-    assert result_bad["answer"].total_score < answer.total_score
+    result_bad = agent_service.score_migration_answer(sid, q.question_id, "不知道")
+    assert result_bad["answer"].total_score is None
 
 
 def test_migration_stats():
@@ -274,8 +269,8 @@ def test_migration_stats():
     agent_service.score_migration_answer(sid, q.question_id, "这个实验有问题,因为数据泄漏,应该改划分方式")
 
     stats = version_diff_service.get_stats(sid)
-    assert stats.migration_total == 1
-    assert stats.migration_avg_score > 0
+    assert stats.migration_total == 0
+    assert stats.migration_avg_score == 0
 
 
 # ---- 数据一致性 ----

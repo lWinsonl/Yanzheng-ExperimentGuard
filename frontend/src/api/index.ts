@@ -271,6 +271,10 @@ export function skipFollowup(
   })
 }
 
+export function reviewFollowupAnswer(sessionId: string, questionId: string): Promise<FollowupQuestion> {
+  return request(`/sessions/${sessionId}/followups/${questionId}/review`, { method: 'POST' })
+}
+
 export function getFollowupStats(
   sessionId: string,
 ): Promise<FollowupStats> {

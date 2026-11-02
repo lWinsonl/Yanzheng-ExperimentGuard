@@ -22,6 +22,7 @@ from app.models.evidence import (
 )
 from app.models.review import Finding, FindingLevel
 from app.rules.base import RuleBase
+from app.services.evidence_checks import observed_repetitions
 
 
 def _to_ref(f: ExtractedFact) -> EvidenceRef:
@@ -183,7 +184,7 @@ class StabilityRepetitionRule(RuleBase):
         rep_facts = grouped.get(FactCategory.REPETITION, [])
 
         has_multi_run = any(
-            _match_any(f.effective_value(), _MULTI_RUN_PATTERNS) for f in rep_facts
+            observed_repetitions(f, docs) for f in rep_facts
         )
         if has_multi_run:
             return []

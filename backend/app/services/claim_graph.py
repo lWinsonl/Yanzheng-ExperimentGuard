@@ -34,6 +34,7 @@ from app.models.claim_graph import (
 )
 from app.models.evidence import ExtractedFact, FactCategory, MaterialRole
 from app.services.store import data_store
+from app.services.evidence_checks import entity_overlap
 
 logger = logging.getLogger("claim_graph")
 
@@ -92,7 +93,7 @@ class ClaimGraphService:
         old_graph = store.claim_graph
 
         usable = store.usable_facts()
-        graph = ClaimGraph(session_id=session_id, created_at=datetime.now().isoformat())
+        graph = ClaimGraph(session_id=session_id, rule_version=2, created_at=datetime.now().isoformat())
 
         # 1. 拆解子主张
         for claim in session.claims:
@@ -124,6 +125,8 @@ class ClaimGraphService:
 
     def get_graph(self, session_id: str) -> ClaimGraph | None:
         store = data_store.get(session_id)
+        if store and store.claim_graph and store.claim_graph.rule_version < 2:
+            return self.build_graph(session_id)
         return store.claim_graph if store else None
 
     # ---- 用户校准 ----
@@ -234,7 +237,7 @@ class ClaimGraphService:
         if _match_any(text, _NEW_ENTITY_PATTERNS):
             subs.append(SubClaim(
                 claim_id=claim.claim_id,
-                text="测试集由训练时未见过的设备/实体组成(无数据泄漏)",
+                text="所提供训练/测试实体编号列表无交集（仍需核对来源与其他泄漏途径）",
                 test_aspect=TestAspect.SCOPE,
                 scope_keywords=keywords or ["新设备"],
             ))
@@ -289,154 +292,49 @@ class ClaimGraphService:
             return self._edges_for_metric(sc, by_cat.get(FactCategory.METRIC, []))
         return []
 
-    def _edges_for_scope(
-        self, sc: SubClaim, split_facts: list[ExtractedFact]
-    ) -> list[ClaimEvidenceEdge]:
-        """scope 子主张:划分方式是否支持"未见实体"。"""
-        edges: list[ClaimEvidenceEdge] = []
-        if not split_facts:
-            edges.append(ClaimEvidenceEdge(
-                sub_claim_id=sc.sub_claim_id, fact_id=None,
-                relation=EdgeRelation.UNKNOWN,
-                basis="未提供任何数据划分信息,无法核实测试集是否由未见实体组成",
-                direction=EvidenceDirection.MISSING_PREMISE,
-                scope="、".join(sc.scope_keywords) if sc.scope_keywords else "",
-            ))
-            return edges
-
+    def _edges_for_scope(self, sc: SubClaim, split_facts: list[ExtractedFact]) -> list[ClaimEvidenceEdge]:
+        edges = []
         for f in split_facts:
-            val = f.effective_value()
-            role = _fact_role(f)
-            direction = EvidenceDirection.PLAN if role == MaterialRole.PLAN else EvidenceDirection.EXECUTION
-            if _match_any(val, _GROUP_SPLIT_PATTERNS):
-                edges.append(ClaimEvidenceEdge(
-                    sub_claim_id=sc.sub_claim_id, fact_id=f.fact_id,
-                    relation=EdgeRelation.SUPPORTS,
-                    basis=f"{'计划' if role == MaterialRole.PLAN else '执行'}材料显示按设备/组划分,与'测试集为未见实体'一致",
-                    direction=direction,
-                ))
-            elif _match_any(val, _RECORD_SPLIT_PATTERNS):
-                edges.append(ClaimEvidenceEdge(
-                    sub_claim_id=sc.sub_claim_id, fact_id=f.fact_id,
-                    relation=EdgeRelation.CONTRADICTS,
-                    basis=f"{'计划' if role == MaterialRole.PLAN else '执行'}材料显示按记录随机划分,同设备记录可能同时进入训练与测试集",
-                    direction=direction,
-                ))
-        return edges
-
-    def _edges_for_comparison(
-        self, sc: SubClaim, by_cat: dict[FactCategory, list[ExtractedFact]]
-    ) -> list[ClaimEvidenceEdge]:
-        """comparison 子主张:是否有指标与基线支持比较结论。"""
-        edges: list[ClaimEvidenceEdge] = []
-        metric_facts = by_cat.get(FactCategory.METRIC, [])
-        baseline_facts = by_cat.get(FactCategory.BASELINE, [])
-
-        for f in metric_facts:
+            store = data_store.get(f.session_id)
+            overlap = entity_overlap(f, store.docs) if store else None
+            relation = EdgeRelation.UNKNOWN
+            basis = "存在划分相关材料；函数名称或分组计划不能证明实际实体是否重叠，需提供训练/测试实体编号。"
+            if overlap is not None:
+                relation = EdgeRelation.CONTRADICTS if overlap else EdgeRelation.SUPPORTS
+                basis = ("提供的实体列表存在交集：" + ", ".join(sorted(overlap)[:10]) if overlap else
+                         "提供的训练/测试实体编号列表无交集；仅支持这些列表的实体隔离，不验证列表来源、完整性或其他泄漏。")
             edges.append(ClaimEvidenceEdge(
-                sub_claim_id=sc.sub_claim_id, fact_id=f.fact_id,
-                relation=EdgeRelation.SUPPORTS,
-                basis="提供了评价指标数值,比较结论可被量化核实",
-                direction=EvidenceDirection.RESULT,
+                sub_claim_id=sc.sub_claim_id, fact_id=f.fact_id, relation=relation,
+                basis=basis, direction=(EvidenceDirection.PLAN if _fact_role(f) == MaterialRole.PLAN else EvidenceDirection.EXECUTION),
             ))
-        for f in baseline_facts:
-            edges.append(ClaimEvidenceEdge(
-                sub_claim_id=sc.sub_claim_id, fact_id=f.fact_id,
-                relation=EdgeRelation.SUPPORTS,
-                basis="材料中存在基线方法运行记录,存在比较对象",
-                direction=EvidenceDirection.RESULT,
-            ))
-        if not metric_facts and not baseline_facts:
-            edges.append(ClaimEvidenceEdge(
-                sub_claim_id=sc.sub_claim_id, fact_id=None,
-                relation=EdgeRelation.UNKNOWN,
-                basis="未发现指标数值或基线记录,比较结论无法核实",
-                direction=EvidenceDirection.MISSING_PREMISE,
-            ))
-        return edges
+        return edges or [ClaimEvidenceEdge(sub_claim_id=sc.sub_claim_id, fact_id=None,
+            relation=EdgeRelation.UNKNOWN, basis="缺少实际划分与实体编号记录。", direction=EvidenceDirection.MISSING_PREMISE)]
 
-    def _edges_for_stability(
-        self, sc: SubClaim, rep_facts: list[ExtractedFact]
-    ) -> list[ClaimEvidenceEdge]:
-        """stability 子主张:是否有多次运行波动数据。"""
-        edges: list[ClaimEvidenceEdge] = []
-        if not rep_facts:
-            edges.append(ClaimEvidenceEdge(
-                sub_claim_id=sc.sub_claim_id, fact_id=None,
-                relation=EdgeRelation.UNKNOWN,
-                basis="未提供任何重复运行或随机种子信息,稳定性无法核实",
-                direction=EvidenceDirection.MISSING_PREMISE,
-            ))
-            return edges
+    def _edges_for_comparison(self, sc: SubClaim, by_cat: dict[FactCategory, list[ExtractedFact]]) -> list[ClaimEvidenceEdge]:
+        facts = by_cat.get(FactCategory.METRIC, []) + by_cat.get(FactCategory.BASELINE, [])
+        return self._related_edges(sc, facts, "发现指标或基线材料；尚未自动核对双方数值、指标方向及相同评价条件，不能据此认定优于基线。")
 
-        has_multi = any(_match_any(f.effective_value(), _MULTI_RUN_PATTERNS) for f in rep_facts)
-        for f in rep_facts:
-            val = f.effective_value()
-            if _match_any(val, _MULTI_RUN_PATTERNS):
-                edges.append(ClaimEvidenceEdge(
-                    sub_claim_id=sc.sub_claim_id, fact_id=f.fact_id,
-                    relation=EdgeRelation.SUPPORTS,
-                    basis="发现多次运行的波动报告(均值±标准差),稳定性可被核实",
-                    direction=EvidenceDirection.RESULT,
-                ))
-            elif has_multi:
-                continue  # 已有更强证据,弱证据边不重复建
-            elif "seed" in val.lower() or "random_state" in val.lower():
-                edges.append(ClaimEvidenceEdge(
-                    sub_claim_id=sc.sub_claim_id, fact_id=f.fact_id,
-                    relation=EdgeRelation.CONTRADICTS,
-                    basis="仅发现随机种子设置,未见多次运行波动报告,单次结果无法体现稳定性",
-                    direction=EvidenceDirection.EXECUTION,
-                ))
-        return edges
+    @staticmethod
+    def _related_edges(sc, facts, basis):
+        return [ClaimEvidenceEdge(
+            sub_claim_id=sc.sub_claim_id, fact_id=f.fact_id, relation=EdgeRelation.UNKNOWN,
+            basis=basis + (" 此项来自计划，尚非执行结果。" if _fact_role(f) == MaterialRole.PLAN else ""),
+            direction=(EvidenceDirection.PLAN if _fact_role(f) == MaterialRole.PLAN else EvidenceDirection.EXECUTION),
+        ) for f in facts] or [ClaimEvidenceEdge(
+            sub_claim_id=sc.sub_claim_id, fact_id=None, relation=EdgeRelation.UNKNOWN,
+            basis="未提供相关证据，无法核实。", direction=EvidenceDirection.MISSING_PREMISE,
+        )]
 
-    def _edges_for_baseline_fairness(
-        self, sc: SubClaim, baseline_facts: list[ExtractedFact]
-    ) -> list[ClaimEvidenceEdge]:
-        """baseline_fairness 子主张:基线是否在同等条件下评估。"""
-        edges: list[ClaimEvidenceEdge] = []
-        if not baseline_facts:
-            edges.append(ClaimEvidenceEdge(
-                sub_claim_id=sc.sub_claim_id, fact_id=None,
-                relation=EdgeRelation.UNKNOWN,
-                basis="未发现基线方法运行记录,比较公平性无法核实",
-                direction=EvidenceDirection.MISSING_PREMISE,
-            ))
-            return edges
+    def _edges_for_stability(self, sc: SubClaim, rep_facts: list[ExtractedFact]) -> list[ClaimEvidenceEdge]:
+        return self._related_edges(sc, rep_facts, "重复次数、种子或波动数据是相关线索；还需核对各方法的实际重复结果与条件，才能判断是否更稳定。")
 
-        for f in baseline_facts:
-            edges.append(ClaimEvidenceEdge(
-                sub_claim_id=sc.sub_claim_id, fact_id=f.fact_id,
-                relation=EdgeRelation.SUPPORTS,
-                basis="存在基线运行记录;但是否与主方法使用相同划分与指标仍需核对",
-                direction=EvidenceDirection.RESULT,
-            ))
-        return edges
+    def _edges_for_baseline_fairness(self, sc: SubClaim, baseline_facts: list[ExtractedFact]) -> list[ClaimEvidenceEdge]:
+        return self._related_edges(sc, baseline_facts, "存在基线相关材料；尚未核对划分、指标、预处理与预算是否一致，比较公平性待核实。")
 
-    def _edges_for_metric(
-        self, sc: SubClaim, metric_facts: list[ExtractedFact]
-    ) -> list[ClaimEvidenceEdge]:
-        """metric_avail 子主张:是否提供了评价指标。"""
-        edges: list[ClaimEvidenceEdge] = []
-        if not metric_facts:
-            edges.append(ClaimEvidenceEdge(
-                sub_claim_id=sc.sub_claim_id, fact_id=None,
-                relation=EdgeRelation.UNKNOWN,
-                basis="未发现任何评价指标,结论无法被量化核实",
-                direction=EvidenceDirection.MISSING_PREMISE,
-            ))
-            return edges
+    def _edges_for_metric(self, sc: SubClaim, metric_facts: list[ExtractedFact]) -> list[ClaimEvidenceEdge]:
+        return self._related_edges(sc, metric_facts, "提及评价指标；指标名称本身不能替代计算定义与实际数值，完整性待核实。")
 
-        for f in metric_facts:
-            edges.append(ClaimEvidenceEdge(
-                sub_claim_id=sc.sub_claim_id, fact_id=f.fact_id,
-                relation=EdgeRelation.SUPPORTS,
-                basis="提供了评价指标,结论可被量化核实",
-                direction=EvidenceDirection.RESULT,
-            ))
-        return edges
-
-    # ---- 内部:反证检查 ----
+    # ---- 反证与替代解释 ----
 
     def _counter_check_for_sub_claim(
         self, sc: SubClaim, facts: list[ExtractedFact]
@@ -456,59 +354,20 @@ class ClaimGraphService:
             return self._counter_for_baseline_fairness(sc, by_cat.get(FactCategory.BASELINE, []))
         return None  # metric_avail 不需要反证检查
 
-    def _counter_for_scope(
-        self, sc: SubClaim, by_cat: dict[FactCategory, list[ExtractedFact]]
-    ) -> CounterEvidenceCheck:
-        """scope 反证:设备编号是否重叠(数据泄漏)。
-
-        认识论区分:
-        - 执行为记录级随机划分 → counter_exists(划分方式本身就是反证)
-        - 有"无交集/不重叠"直接证据 → counter_refuted(反证被排除)
-        - 划分为组级但无交集直接证据 → no_counter_found(没找到反证≠证明不存在)
-        """
-        split_facts = by_cat.get(FactCategory.DATA_SPLIT, [])
-        ds_facts = by_cat.get(FactCategory.DATASET_DESC, [])
-        all_text = " ".join(_fact_text(f) for f in split_facts + ds_facts)
-
-        if _match_any(all_text, _OVERLAP_PATTERNS):
-            return CounterEvidenceCheck(
-                sub_claim_id=sc.sub_claim_id,
-                alternative_explanation="训练集与测试集的设备编号存在重叠,测试集并非全由未见设备组成",
-                proof_status=CounterProofStatus.COUNTER_EXISTS,
-                basis="材料中出现了设备编号重叠/交集的记录,数据泄漏反证成立",
-                fact_ids=[f.fact_id for f in split_facts + ds_facts],
-                missing_to_prove_absence=[],
-            )
-
-        exec_splits = [f for f in split_facts if _fact_role(f) == MaterialRole.EXECUTION]
-        exec_text = " ".join(_fact_text(f) for f in exec_splits)
-        if _match_any(exec_text, _RECORD_SPLIT_PATTERNS) and not _match_any(exec_text, _GROUP_SPLIT_PATTERNS):
-            return CounterEvidenceCheck(
-                sub_claim_id=sc.sub_claim_id,
-                alternative_explanation="执行为记录级随机划分,同设备记录可能同时进入训练与测试集(数据泄漏)",
-                proof_status=CounterProofStatus.COUNTER_EXISTS,
-                basis="记录级划分方式本身构成反证:无法保证测试集由未见设备组成",
-                fact_ids=[f.fact_id for f in exec_splits],
-                missing_to_prove_absence=[],
-            )
-
-        if _match_any(all_text, _NO_OVERLAP_PATTERNS):
-            return CounterEvidenceCheck(
-                sub_claim_id=sc.sub_claim_id,
-                alternative_explanation="训练集与测试集的设备编号可能存在重叠(数据泄漏)",
-                proof_status=CounterProofStatus.COUNTER_REFUTED,
-                basis="材料提供了设备编号无交集/不重叠的直接证据,泄漏反证被排除",
-                fact_ids=[f.fact_id for f in ds_facts if _match_any(f.effective_value(), _NO_OVERLAP_PATTERNS)],
-                missing_to_prove_absence=[],
-            )
-
+    def _counter_for_scope(self, sc: SubClaim, by_cat: dict[FactCategory, list[ExtractedFact]]) -> CounterEvidenceCheck:
+        facts = by_cat.get(FactCategory.DATA_SPLIT, [])
+        checked = [(f, entity_overlap(f, data_store.require(f.session_id).docs)) for f in facts]
+        overlaps = [(f, overlap) for f, overlap in checked if overlap]
+        disjoint = [(f, overlap) for f, overlap in checked if overlap is not None and not overlap]
+        status = CounterProofStatus.COUNTER_EXISTS if overlaps else CounterProofStatus.NO_COUNTER_FOUND
         return CounterEvidenceCheck(
-            sub_claim_id=sc.sub_claim_id,
-            alternative_explanation="训练集与测试集的设备编号可能存在重叠(数据泄漏)",
-            proof_status=CounterProofStatus.NO_COUNTER_FOUND,
-            basis="在已有材料中未发现设备编号重叠的证据,但也未提供无交集的直接证明——不能排除泄漏",
-            fact_ids=[f.fact_id for f in split_facts],
-            missing_to_prove_absence=["训练集与测试集设备编号交集检查结果(用于把'没找到反证'升级为'证明不存在反证')"],
+            sub_claim_id=sc.sub_claim_id, alternative_explanation="训练/测试实体可能重叠，削弱未见实体泛化的论证",
+            proof_status=status,
+            basis=("提供的实体列表检出交集。" if overlaps else
+                   "提供的实体列表无交集；尚未验证列表来源、完整性与其他泄漏途径。" if disjoint else
+                   "函数名、分组说明或无交集口头声明均不足以核实实际实体隔离。"),
+            fact_ids=[f.fact_id for f in facts],
+            missing_to_prove_absence=["完整训练/测试实体编号与可复查的划分日志"],
         )
 
     def _counter_for_comparison(
@@ -534,38 +393,14 @@ class ClaimGraphService:
             missing_to_prove_absence=["基线与主方法评估条件一致的直接说明"],
         )
 
-    def _counter_for_stability(
-        self, sc: SubClaim, rep_facts: list[ExtractedFact]
-    ) -> CounterEvidenceCheck:
-        """stability 反证:单次运行的'稳定'可能只是偶然。"""
-        if not rep_facts:
-            return CounterEvidenceCheck(
-                sub_claim_id=sc.sub_claim_id,
-                alternative_explanation="单次运行的'稳定'可能只是偶然,换种子或换划分后优势可能消失",
-                proof_status=CounterProofStatus.NO_COUNTER_FOUND,
-                basis="未提供任何重复运行信息,偶然性反证既未找到也未被排除",
-                fact_ids=[],
-                missing_to_prove_absence=["多次运行(建议≥5次)的均值±标准差"],
-            )
-
-        has_multi = any(_match_any(f.effective_value(), _MULTI_RUN_PATTERNS) for f in rep_facts)
-        if has_multi:
-            return CounterEvidenceCheck(
-                sub_claim_id=sc.sub_claim_id,
-                alternative_explanation="单次运行的'稳定'可能只是偶然,换种子或换划分后优势可能消失",
-                proof_status=CounterProofStatus.COUNTER_REFUTED,
-                basis="提供了多次运行的波动数据(均值±标准差),偶然性反证被排除",
-                fact_ids=[f.fact_id for f in rep_facts if _match_any(f.effective_value(), _MULTI_RUN_PATTERNS)],
-                missing_to_prove_absence=[],
-            )
-
+    def _counter_for_stability(self, sc: SubClaim, rep_facts: list[ExtractedFact]) -> CounterEvidenceCheck:
         return CounterEvidenceCheck(
             sub_claim_id=sc.sub_claim_id,
-            alternative_explanation="单次运行的'稳定'可能只是偶然,换种子或换划分后优势可能消失",
-            proof_status=CounterProofStatus.COUNTER_EXISTS,
-            basis="仅有单次运行(或仅设随机种子),无多次运行波动数据——单次结果本身就是对稳定性主张的反证",
+            alternative_explanation="观测到的优势可能来自运行波动或评价条件差异",
+            proof_status=CounterProofStatus.NO_COUNTER_FOUND,
+            basis="单次运行不能证明不稳定；多次运行也不能自动排除偶然性。尚需核对原始重复结果、比较条件与不确定性。",
             fact_ids=[f.fact_id for f in rep_facts],
-            missing_to_prove_absence=["多次运行的均值±标准差(可消除此反证)"],
+            missing_to_prove_absence=["各方法相同条件下的重复结果、波动与不确定性分析"],
         )
 
     def _counter_for_baseline_fairness(

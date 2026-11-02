@@ -191,12 +191,12 @@ class MigrationAnswer(BaseModel):
     answered_at: str = ""
 
     # 推理过程评分(各维度 0-1)
-    identifies_core_issue: float = 0.0
-    explains_why: float = 0.0
-    proposes_fix: float = 0.0
-    reasoning_quality: float = 0.0
+    identifies_core_issue: float | None = Field(default=None, ge=0, le=1, allow_inf_nan=False)
+    explains_why: float | None = Field(default=None, ge=0, le=1, allow_inf_nan=False)
+    proposes_fix: float | None = Field(default=None, ge=0, le=1, allow_inf_nan=False)
+    reasoning_quality: float | None = Field(default=None, ge=0, le=1, allow_inf_nan=False)
 
-    total_score: float = 0.0
+    total_score: float | None = Field(default=None, ge=0, le=1, allow_inf_nan=False)
     """四维平均(0-1)。"""
 
     feedback: str = ""
@@ -204,6 +204,9 @@ class MigrationAnswer(BaseModel):
 
     source: str = "heuristic"
     """heuristic / llm。"""
+
+    score_status: str = "legacy_unverified"
+    """model_feedback / feedback_only / legacy_unverified；单次模型反馈不证明掌握。"""
 
 
 class ManualReviewLabel(BaseModel):

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from app.services import data_store, evidence_chain
 
@@ -11,13 +11,17 @@ router = APIRouter(prefix="/api/sessions", tags=["sessions"])
 
 
 class CreateSessionRequest(BaseModel):
-    title: str = ""
+    title: str = Field(default="", max_length=200)
     experiment_type: str = "data_model"
-    claims: list[str] = []
+    claims: list[str] = Field(default_factory=list, max_length=10)
 
 
 @router.post("")
 def create_session(req: CreateSessionRequest):
+    if len(data_store.all_sessions()) >= 20:
+        raise HTTPException(status_code=429, detail="演示版每个浏览器最多创建 20 个审查会话")
+    if any(len(claim) > 4000 for claim in req.claims):
+        raise HTTPException(status_code=422, detail="每条研究主张请控制在 4000 字以内")
     session = evidence_chain.create_session(req.title, req.experiment_type, req.claims)
     return session
 
@@ -61,7 +65,7 @@ def get_material_content(session_id: str, material_id: str):
     store = data_store.get(session_id)
     if store is None:
         raise HTTPException(status_code=404, detail="会话不存在")
-    doc = store.docs.get(material_id)
+    doc = store.docs.get(material_id) or store.archived_docs.get(material_id)
     if doc is None:
         raise HTTPException(status_code=404, detail="材料不存在")
     return doc

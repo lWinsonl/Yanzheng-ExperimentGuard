@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from app.services.followup import followup_service
 
@@ -11,7 +11,7 @@ router = APIRouter(prefix="/api/sessions/{session_id}/followups", tags=["followu
 
 
 class AnswerRequest(BaseModel):
-    answer_text: str
+    answer_text: str = Field(min_length=1, max_length=20000)
 
 
 class SkipRequest(BaseModel):
@@ -46,7 +46,20 @@ def answer_question(session_id: str, question_id: str, req: AnswerRequest):
         q = followup_service.record_answer(session_id, question_id, req.answer_text)
     except KeyError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
     return q
+
+
+@router.post("/{question_id}/review")
+def review_answer(session_id: str, question_id: str):
+    """新事实全部裁决后,重新审查并对比原发现。"""
+    try:
+        return followup_service.review_answer(session_id, question_id)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
 
 
 @router.post("/{question_id}/skip")
@@ -68,4 +81,4 @@ def get_stats(session_id: str):
 @router.get("/global-stats")
 def get_global_stats():
     """跨会话追问统计(离线比较排序前后效果)。"""
-    return followup_service.get_global_stats()
+    raise HTTPException(status_code=404, detail="公开演示不提供跨浏览器会话统计")

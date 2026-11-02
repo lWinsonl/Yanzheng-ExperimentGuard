@@ -181,7 +181,9 @@ class FollowupService:
     def save_questions(self, session_id: str, questions: list[FollowupQuestion]) -> None:
         """保存追问列表到会话(替换旧列表)。"""
         store = data_store.require(session_id)
-        store.followup_questions = questions
+        history = [q for q in store.followup_questions if q.status != FollowupStatus.PENDING]
+        asked = {(q.question, q.target_finding_title) for q in history}
+        store.followup_questions = history + [q for q in questions if (q.question, q.target_finding_title) not in asked]
         data_store.persist(session_id)
 
     def get_questions(self, session_id: str) -> list[FollowupQuestion]:
@@ -190,84 +192,88 @@ class FollowupService:
 
     # ---- 回答追踪 ----
 
-    def record_answer(
-        self,
-        session_id: str,
-        question_id: str,
-        answer_text: str,
-    ) -> FollowupQuestion:
-        """记录用户回答,重算审查,追踪该回答是否实际改变了发现。
+    def record_answer(self, session_id: str, question_id: str, answer_text: str) -> FollowupQuestion:
+        """回答作为独立材料保存,所有新事实先等待用户裁决。"""
+        from app.models.evidence import ExtractedFact, FactCategory, SourceSpan
+        from app.services.evidence_chain import evidence_chain
 
-        流程:
-        1. 记录回答文本与时间。
-        2. 重新运行审查(新事实可能已从回答中提取,或用户已补充材料)。
-        3. 对比新旧报告中该追问的目标发现:
-           - 消失 → answer_changed_finding=True, detail="该发现已消除"
-           - 级别降低 → True, detail="从 X 降为 Y"
-           - 内容变化 → True, detail="发现内容已更新"
-           - 无变化 → False
-        """
+        store = data_store.require(session_id)
+        q = next((q for q in store.followup_questions if q.question_id == question_id), None)
+        if q is None:
+            raise KeyError(f"追问不存在:{question_id}")
+        text = answer_text.strip()
+        if not text:
+            raise ValueError("请输入回答内容")
+        if q.answer_material_id:
+            if q.answer_text == text:
+                return q  # 重试不创建重复材料
+            raise ValueError("此回答已保存；请通过补充材料更正，并重新确认事实")
+
+        old_report = store.latest_report()
+        doc, facts, _ = evidence_chain.extract_from_text(
+            session_id, text, f"followup-{q.question_id}.txt", "execution"
+        )
+        doc.origin = "followup_answer"
+        if not facts:
+            fact = ExtractedFact(
+                session_id=session_id, category=FactCategory.OTHER, value=text,
+                source=SourceSpan(material_id=doc.material_id, start_char=0,
+                                  end_char=len(text), snippet=text),
+                note="用户补充说明；尚未识别为可用于具体规则的执行证据",
+            )
+            store.add_fact(fact)
+            facts = [fact]
+        for fact in facts:
+            fact.note = "追问回答（用户说明，非独立运行证明）。" + fact.note
+        q.answer_text = text
+        q.answered_at = datetime.now().isoformat()
+        q.status = FollowupStatus.ANSWERED
+        q.answer_material_id = doc.material_id
+        q.answer_fact_ids = [f.fact_id for f in facts]
+        q.baseline_report_id = old_report.report_id if old_report else ""
+        q.review_state = "awaiting_confirmation"
+        q.answer_changed_finding = False
+        q.finding_change_detail = "回答已保存。请核对新提取的事实，确认或拒绝后再重新审查。"
+        data_store.persist(session_id)
+        return q
+
+    def review_answer(self, session_id: str, question_id: str) -> FollowupQuestion:
+        from app.models.evidence import FactStatus
         from app.services.review import review_service
 
         store = data_store.require(session_id)
-        q = next(
-            (fq for fq in store.followup_questions if fq.question_id == question_id),
-            None,
-        )
+        q = next((q for q in store.followup_questions if q.question_id == question_id), None)
         if q is None:
             raise KeyError(f"追问不存在:{question_id}")
-
-        # 记录旧报告中的目标发现
-        old_report = store.latest_report()
-        old_finding = None
-        if old_report and q.target_finding_id:
-            old_finding = next(
-                (f for f in old_report.findings if f.finding_id == q.target_finding_id),
-                None,
-            )
-
-        # 记录回答
-        q.answer_text = answer_text
-        q.answered_at = datetime.now().isoformat()
-        q.status = FollowupStatus.ANSWERED
-
-        # 重算审查(回答可能已通过补充材料改变了事实集)
-        try:
-            new_report = review_service.run_review(session_id)
-        except Exception as exc:  # noqa: BLE001
-            logger.warning("回答后重算审查失败:%s", exc)
-            data_store.persist(session_id)
-            return q
-
-        # 对比发现变化
-        if old_finding is None:
-            q.answer_changed_finding = False
-            q.finding_change_detail = "原发现已不存在(可能因材料替换被清除)"
+        if not q.answer_material_id:
+            raise ValueError("请先提交回答")
+        facts = [store.facts.get(fid) for fid in q.answer_fact_ids]
+        if any(f is None for f in facts):
+            raise ValueError("回答材料已变更，请重新补充材料")
+        if any(f.status == FactStatus.PENDING for f in facts):
+            raise ValueError("请先逐条确认、纠正或拒绝回答中提取的事实")
+        old_report = store.reports.get(q.baseline_report_id)
+        old = next((f for f in old_report.findings if f.finding_id == q.target_finding_id), None) if old_report else None
+        new_report = review_service.run_review(session_id)
+        q.review_state = "reviewed"
+        q.answer_changed_finding = False
+        if old is None:
+            q.finding_change_detail = "审查已更新；此追问未绑定可对比的原发现，无法归因其变化。"
         else:
-            new_finding = next(
-                (f for f in new_report.findings if f.rule_id == old_finding.rule_id),
-                None,
-            )
-            if new_finding is None:
+            candidates = [f for f in new_report.findings if f.rule_id == old.rule_id
+                          and set(f.claim_ids) == set(old.claim_ids)]
+            if not candidates:
                 q.answer_changed_finding = True
-                q.finding_change_detail = "该发现已消除(回答提供的证据解决了此问题)"
-            elif new_finding.level != old_finding.level:
-                old_lv = _level_label(old_finding.level)
-                new_lv = _level_label(new_finding.level)
+                q.finding_change_detail = "重新审查后原发现不再触发；这不代表整个实验已通过审查。"
+            elif len(candidates) != 1:
+                q.finding_change_detail = "存在多个同类发现，暂不能可靠配对；请查看最新报告。"
+            elif candidates[0].level != old.level or candidates[0].title != old.title:
                 q.answer_changed_finding = True
-                q.finding_change_detail = f"发现级别从{old_lv}变为{new_lv}"
-            elif new_finding.title != old_finding.title:
-                q.answer_changed_finding = True
-                q.finding_change_detail = "发现内容已更新"
+                q.finding_change_detail = f"重新审查后发现有变化：{_level_label(old.level)} → {_level_label(candidates[0].level)}。{candidates[0].title}"
             else:
-                q.answer_changed_finding = False
-                q.finding_change_detail = "回答未改变此发现(可能需要更直接的证据)"
-
+                q.finding_change_detail = "原发现仍存在。补充说明已纳入审查，仍需所列的代码或运行记录。"
+        store.claim_graph = None  # 下次打开证据图时按新事实重建
         data_store.persist(session_id)
-        logger.info(
-            "追问 %s 已回答,changed=%s, detail=%s",
-            question_id, q.answer_changed_finding, q.finding_change_detail,
-        )
         return q
 
     def skip_question(self, session_id: str, question_id: str) -> FollowupQuestion:

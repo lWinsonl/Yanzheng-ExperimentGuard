@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import type { ClaimGraph, DeepReviewResult, DeepReviewStatus, Finding, Followup, ReviewReport } from '../types'
+import type { ClaimGraph, DeepReviewResult, DeepReviewStatus, Finding, ReviewReport } from '../types'
 import {
   ASPECT_LABELS,
   CATEGORY_LABELS,
@@ -8,14 +8,11 @@ import {
   LEVEL_LABELS,
   RELATION_LABELS,
 } from '../types'
-import { generateFollowups, getLatestReport, runReview } from '../api'
+import { getLatestReport, runReview } from '../api'
 import { FindingCard } from '../components/FindingCard'
 import { DeepReviewPanel } from '../components/DeepReviewPanel'
 import { ClaimGraphPanel } from '../components/ClaimGraphPanel'
-import { FollowupPanel } from '../components/FollowupPanel'
-import { VersionDiffPanel } from '../components/VersionDiffPanel'
-import { MigrationQuiz } from '../components/MigrationQuiz'
-import { TeachingCaseView } from '../components/TeachingCaseView'
+import { FollowupPanel } from '../components/FollowupWorkflow'
 import { LoadingDots } from '../components/LoadingDots'
 
 interface Props {
@@ -33,7 +30,6 @@ export function ReportPage({ sessionId, title, claimTexts, onNext, onBack }: Pro
   const [report, setReport] = useState<ReviewReport | null>(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
-  const [followups, setFollowups] = useState<Followup[]>([])
   const [deepResult, setDeepResult] = useState<DeepReviewResult | null>(null)
   const [graph, setGraph] = useState<ClaimGraph | null>(null)
 
@@ -64,19 +60,6 @@ export function ReportPage({ sessionId, title, claimTexts, onNext, onBack }: Pro
     run()
   }, [])
 
-  /** 报告生成后,如果有信息不足的发现,自动生成追问 */
-  useEffect(() => {
-    if (!report) return
-    const hasInsufficient = report.findings.some((f) => f.level === 'insufficient')
-    if (hasInsufficient) {
-      generateFollowups(sessionId)
-        .then((res) => setFollowups(res.followups ?? []))
-        .catch(() => {})
-    } else {
-      setFollowups([])
-    }
-  }, [report])
-
   const order: Finding['level'][] = ['contradiction', 'risk', 'insufficient']
   const grouped = (report?.findings ?? []).reduce<Record<string, Finding[]>>((acc, f) => {
     ;(acc[f.level] ??= []).push(f)
@@ -93,14 +76,6 @@ export function ReportPage({ sessionId, title, claimTexts, onNext, onBack }: Pro
     lines.push(`- 可用事实:${report.usable_fact_count}`)
     lines.push(`- 未确认/校验失败跳过:${report.skipped_fact_count}`)
     lines.push(`- 发现总计:${report.findings.length}`)
-    if (followups.length > 0) {
-      lines.push('')
-      lines.push('## 智能体追问(待补充信息)')
-      followups.forEach((f) => {
-        lines.push(`- **${f.question}**`)
-        if (f.what_to_provide) lines.push(`  - 请提供:${f.what_to_provide}`)
-      })
-    }
     if (deepResult) {
       lines.push('')
       lines.push('## 模型复核(详细修改建议)')
@@ -229,7 +204,7 @@ export function ReportPage({ sessionId, title, claimTexts, onNext, onBack }: Pro
 
           {report.findings.length === 0 && (
             <div className="success">
-              未发现证据问题。你的主张、计划与执行在已审查维度上一致。
+              当前规则未触发发现。这不代表实验已通过全面审查，也不表示所有主张已被证实。
               仍建议补充设备编号交集等直接证据以进一步确认。
             </div>
           )}
@@ -250,36 +225,24 @@ export function ReportPage({ sessionId, title, claimTexts, onNext, onBack }: Pro
             ) : null,
           )}
 
-          {/* 主张-证据图:可校准的子主张-证据连接 */}
-          <ClaimGraphPanel
-            sessionId={sessionId}
-            claimTexts={claimTexts}
-            onGraphChange={setGraph}
-          />
-
-          {/* 主动追问:基于预期信息价值排序,回答后追踪发现变化 */}
-          <FollowupPanel
-            sessionId={sessionId}
-            onAnswerRecorded={refreshReport}
-          />
-
-          {/* 模型复核:详细修改建议 + 规则盲区 */}
-          <DeepReviewPanel sessionId={sessionId} onResultChange={setDeepResult} />
-
-          {/* 版本差异复审:稳定身份配对 + 五态判定 + 修改理由对照 + 人工标签(P2) */}
-          <VersionDiffPanel sessionId={sessionId} />
-
-          {/* 学习迁移评估:不同情境同方法要点,评分看推理过程(P2) */}
-          <MigrationQuiz sessionId={sessionId} />
-
-          {/* 教学小案例:训练实验设计能力 */}
-          <div className="teaching-section">
-            <h3>训练实验设计能力</h3>
-            <p className="muted">
-              看完报告后,试着自己判断一个新案例的实验漏洞——
-              这比只看系统找出的漏洞更能训练你的实验设计能力。
-            </p>
-            <TeachingCaseView sessionId={sessionId} />
+          <section className="workflow-step">
+            <h3>接下来：补充证据，再核对变化</h3>
+            <FollowupPanel sessionId={sessionId} onAnswerRecorded={refreshReport} />
+          </section>
+          <details className="workflow-details">
+            <summary>查看主张与证据的对应关系</summary>
+            <p className="muted">相关材料不等于支持结论；尚未核实的关系会明确标为未知。</p>
+            <ClaimGraphPanel key={report.report_id} sessionId={sessionId}
+              claimTexts={claimTexts} onGraphChange={setGraph} />
+          </details>
+          <details className="workflow-details">
+            <summary>需要进一步建议时，运行模型复核</summary>
+            <DeepReviewPanel sessionId={sessionId} onResultChange={setDeepResult} />
+          </details>
+          <div className="workflow-next">
+            <h3>准备好修改了吗？</h3>
+            <p>补充代码或运行记录后，进入下一步比较修改前后的发现，再完成一道新情境练习。</p>
+            <button className="primary" onClick={onNext}>去修改与复查</button>
           </div>
         </>
       )}

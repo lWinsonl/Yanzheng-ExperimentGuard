@@ -101,6 +101,12 @@ class FollowupQuestion(BaseModel):
     finding_change_detail: str = ""
     """发现变化的详细描述,例如"该发现已消除"或"从 risk 降为 insufficient"。"""
 
+    answer_material_id: str = ""
+    answer_fact_ids: list[str] = Field(default_factory=list)
+    baseline_report_id: str = ""
+    review_state: str = "not_reviewed"
+    """not_reviewed / awaiting_confirmation / reviewed。回答不自动进入审查。"""
+
     created_at: str = ""
 
 

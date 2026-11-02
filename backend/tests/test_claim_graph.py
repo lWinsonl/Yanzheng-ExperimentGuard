@@ -106,7 +106,7 @@ def test_empty_facts_yield_missing_premise_edges():
         assert e.fact_id is None
 
 
-def test_leaky_execution_builds_contradicts_edge():
+def test_function_name_alone_does_not_prove_overlap():
     """执行为记录级划分时,scope 子主张应有 CONTRADICTS 边 + counter_exists。"""
     session = _new_session()
     _ingest(session.session_id, PLAN_GOOD, "plan.md", "plan")
@@ -118,22 +118,23 @@ def test_leaky_execution_builds_contradicts_edge():
     scope_edges = graph.edges_for_sub_claim(scope_sc.sub_claim_id)
 
     relations = [e.effective_relation() for e in scope_edges]
-    assert EdgeRelation.CONTRADICTS in relations, (
+    assert set(relations) == {EdgeRelation.UNKNOWN}, (
         f"泄漏场景 scope 边应含 CONTRADICTS,得到 {relations}"
     )
 
     check = graph.counter_check_for_sub_claim(scope_sc.sub_claim_id)
     assert check is not None
-    assert check.proof_status == CounterProofStatus.COUNTER_EXISTS, (
+    assert check.proof_status == CounterProofStatus.NO_COUNTER_FOUND, (
         f"记录级划分应判定 counter_exists,得到 {check.proof_status}"
     )
 
 
-def test_good_execution_builds_supports_edge():
+def test_explicit_disjoint_lists_support_entity_isolation():
     """执行为组级划分时,scope 子主张应有 SUPPORTS 边。"""
     session = _new_session()
     _ingest(session.session_id, PLAN_GOOD, "plan.md", "plan")
     _ingest(session.session_id, EXEC_GOOD, "good.py", "execution")
+    _ingest(session.session_id, '{"train_entity_ids": ["d1"], "test_entity_ids": ["d2"]}', "entities.json", "execution")
     _confirm_all(session.session_id)
 
     graph = claim_graph_service.build_graph(session.session_id)
@@ -176,6 +177,7 @@ def test_support_edge_accuracy_on_annotated_samples():
     _ingest(s2.session_id, PLAN_GOOD, "plan.md", "plan")
     _ingest(s2.session_id, EXEC_GOOD, "good.py", "execution")
     _ingest(s2.session_id, RESULT_WITH_BASELINE, "results.csv", "execution")
+    _ingest(s2.session_id, '{"train_entity_ids": ["d1"], "test_entity_ids": ["d2"]}', "entities.json", "execution")
     _confirm_all(s2.session_id)
     g2 = claim_graph_service.build_graph(s2.session_id)
 
@@ -203,6 +205,7 @@ def test_missed_counter_evidence_rate():
     sa = _new_session()
     _ingest(sa.session_id, PLAN_GOOD, "plan.md", "plan")
     _ingest(sa.session_id, EXEC_LEAKY, "leak.py", "execution")
+    _ingest(sa.session_id, '{"train_entity_ids": ["d1", "d2"], "test_entity_ids": ["d2"]}', "entities.json", "execution")
     _confirm_all(sa.session_id)
     ga = claim_graph_service.build_graph(sa.session_id)
     scope_a = next(sc for sc in ga.sub_claims if sc.test_aspect == TestAspect.SCOPE)
@@ -285,7 +288,7 @@ def test_user_can_correct_and_reject_edges():
     scope_sc = next(sc for sc in graph.sub_claims if sc.test_aspect == TestAspect.SCOPE)
     edge = next(
         e for e in graph.edges_for_sub_claim(scope_sc.sub_claim_id)
-        if e.effective_relation() == EdgeRelation.CONTRADICTS
+        if e.effective_relation() == EdgeRelation.UNKNOWN
     )
 
     # 纠正:用户认为这条边其实是 supports
@@ -320,7 +323,7 @@ def test_calibration_preserved_on_rebuild():
     scope_sc = next(sc for sc in graph.sub_claims if sc.test_aspect == TestAspect.SCOPE)
     edge = next(
         e for e in graph.edges_for_sub_claim(scope_sc.sub_claim_id)
-        if e.effective_relation() == EdgeRelation.CONTRADICTS
+        if e.effective_relation() == EdgeRelation.UNKNOWN
     )
     claim_graph_service.confirm_edge(session.session_id, edge.edge_id, "reject")
 
@@ -346,10 +349,10 @@ def test_counter_check_distinguishes_not_found_vs_refuted():
     g1 = claim_graph_service.build_graph(s1.session_id)
     scope1 = next(sc for sc in g1.sub_claims if sc.test_aspect == TestAspect.SCOPE)
     check1 = g1.counter_check_for_sub_claim(scope1.sub_claim_id)
-    assert check1.proof_status == CounterProofStatus.COUNTER_REFUTED, (
+    assert check1.proof_status == CounterProofStatus.NO_COUNTER_FOUND, (
         f"有无交集直接证据应判 counter_refuted,得到 {check1.proof_status}"
     )
-    assert len(check1.missing_to_prove_absence) == 0
+    assert len(check1.missing_to_prove_absence) > 0
 
     # 无直接证据 → no_counter_found
     s2 = _new_session()

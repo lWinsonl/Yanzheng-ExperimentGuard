@@ -503,12 +503,16 @@ class AgentService:
                 suggestion_verify=verify,
             )
             # 引用校验:quote 必须在某份材料中逐字找到
-            finding.quote_verified = self._verify_quote(store, finding.verified_quote)
-            if finding.verified_quote and not finding.quote_verified:
-                # 引用未通过逐字校验(模型轻微改写):不展示该引用,但保留发现与建议
-                logger.warning("模型复核引用校验失败(清除引用,保留发现):%s", finding.title)
+            matching = [d for d in store.docs.values() if d.filename == finding.material_filename
+                        and finding.verified_quote and len(finding.verified_quote) >= 4
+                        and finding.verified_quote in d.content]
+            finding.quote_verified = len(matching) == 1
+            if not finding.quote_verified:
+                logger.warning("模型复核缺少可绑定到指定文件的引用，降为待核实建议:%s", finding.title)
                 finding.verified_quote = ""
                 finding.material_filename = ""
+                finding.level = "insufficient"
+                finding.reasoning = "引用未通过指定文件校验，以下仅为待核实的模型建议。" + finding.reasoning
             results.append(finding)
         return results
 
@@ -970,74 +974,41 @@ class AgentService:
             if raw:
                 data = llm_client.parse_json_response(raw)
                 if isinstance(data, dict):
-                    answer.identifies_core_issue = float(data.get("identifies_core_issue", 0))
-                    answer.explains_why = float(data.get("explains_why", 0))
-                    answer.proposes_fix = float(data.get("proposes_fix", 0))
-                    answer.reasoning_quality = float(data.get("reasoning_quality", 0))
-                    answer.feedback = data.get("feedback", "")
-                    answer.source = "llm"
-                    answer.total_score = (
-                        answer.identifies_core_issue + answer.explains_why
-                        + answer.proposes_fix + answer.reasoning_quality
-                    ) / 4.0
-                    store.migration_answers.append(answer)
-                    data_store.persist(session_id)
-                    return {"status": "ok", "message": "评分完成", "answer": answer}
+                    import math
+                    dims = ("identifies_core_issue", "explains_why", "proposes_fix", "reasoning_quality")
+                    values = [data.get(dim) for dim in dims]
+                    valid = all(isinstance(v, (int, float)) and not isinstance(v, bool)
+                                and math.isfinite(v) and 0 <= v <= 1 for v in values)
+                    feedback = data.get("feedback")
+                    if valid and isinstance(feedback, str) and feedback.strip():
+                        for dim, value in zip(dims, values):
+                            setattr(answer, dim, float(value))
+                        answer.feedback = feedback.strip()
+                        answer.source = "llm"
+                        answer.score_status = "model_feedback"
+                        answer.total_score = sum(values) / len(values)
+                        store.migration_answers.append(answer)
+                        data_store.persist(session_id)
+                        return {"status": "ok", "message": "已生成模型反馈；单次作答不作为掌握程度证明", "answer": answer}
 
-        # 启发式降级:关键词匹配评分
         answer = self._heuristic_migration_score(question, answer)
         store.migration_answers.append(answer)
         data_store.persist(session_id)
-        return {"status": "ok", "message": "评分完成(启发式)", "answer": answer}
+        return {"status": "feedback_only", "message": "暂未获得有效模型评分，已保存作答并提供自查建议", "answer": answer}
 
     @staticmethod
     def _heuristic_migration_score(question, answer) -> "MigrationAnswer":
-        """启发式迁移评分:基于参考答案关键词与回答的匹配度。"""
-        ref = question.reference_answer.lower()
-        ans = answer.answer_text.lower()
-
-        # 核心问题关键词:从参考答案提取关键概念
-        core_keywords = []
-        for kw in ("泄漏", "划分", "基线", "鲁棒", "稳定", "重复", "多次", "随机", "分组", "泛化", "新"):
-            if kw in ref:
-                core_keywords.append(kw)
-
-        # 识别核心问题:回答中是否提及核心关键词
-        if core_keywords:
-            hit = sum(1 for kw in core_keywords if kw in ans)
-            answer.identifies_core_issue = min(hit / max(len(core_keywords), 1), 1.0)
-        else:
-            answer.identifies_core_issue = 0.3 if len(ans) > 20 else 0.1
-
-        # 解释为什么:回答中是否有因果推理词
-        causal_words = ("因为", "由于", "导致", "使得", "从而", "所以", "原因")
-        answer.explains_why = min(
-            sum(1 for w in causal_words if w in ans) / 2.0, 1.0
-        ) if any(w in ans for w in causal_words) else 0.2
-
-        # 提出修改:回答中是否有修改方向词
-        fix_words = ("修改", "改为", "应该", "建议", "需要", "换成", "调整")
-        answer.proposes_fix = min(
-            sum(1 for w in fix_words if w in ans) / 2.0, 1.0
-        ) if any(w in ans for w in fix_words) else 0.2
-
-        # 推理质量:回答长度与结构(粗略)
-        length_score = min(len(ans) / 100.0, 1.0)
-        structure_score = 0.3 if ("\n" in ans or "。" in ans or ";" in ans) else 0.1
-        answer.reasoning_quality = min(length_score * 0.6 + structure_score, 1.0)
-
-        answer.total_score = (
-            answer.identifies_core_issue + answer.explains_why
-            + answer.proposes_fix + answer.reasoning_quality
-        ) / 4.0
-        answer.feedback = (
-            f"启发式评分:核心问题识别 {answer.identifies_core_issue:.0%},"
-            f"因果解释 {answer.explains_why:.0%},"
-            f"修改方向 {answer.proposes_fix:.0%},"
-            f"推理结构 {answer.reasoning_quality:.0%}。"
-            f"接入模型可获得更精细的推理过程评分。"
-        )
+        """无法可靠评分时只给检查清单，不把关键词和篇幅换算成掌握分数。"""
         answer.source = "heuristic"
+        answer.score_status = "feedback_only"
+        for dim in ("identifies_core_issue", "explains_why", "proposes_fix", "reasoning_quality", "total_score"):
+            setattr(answer, dim, None)
+        answer.feedback = (
+            "作答已保存，本次未给分。请对照参考思路逐项检查："
+            "是否指出了情境中的具体信息；是否解释了它如何影响结论；"
+            "提出的修改能否解决该问题；还需要什么证据验证修改。"
+            "可请教师复核，或在模型服务恢复后重新提交。"
+        )
         return answer
 
 

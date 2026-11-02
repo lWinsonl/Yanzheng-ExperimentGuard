@@ -180,6 +180,7 @@ class ClaimGraph(BaseModel):
     """一次会话的完整主张—证据图。"""
 
     graph_id: str = Field(default_factory=lambda: new_id("graph"))
+    rule_version: int = 1
     session_id: str
     sub_claims: list[SubClaim] = Field(default_factory=list)
     edges: list[ClaimEvidenceEdge] = Field(default_factory=list)

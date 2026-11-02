@@ -504,3 +504,18 @@ button.small.danger { color: #d93025; border-color: #d93025; }
 .reference-answer-area { margin-top: 10px; }
 .reference-answer-text { font-size: 13px; line-height: 1.7; margin-top: 8px; padding: 10px 14px; background: #f6fbf6; border: 1px solid #1e8e3e33; border-radius: 4px; }
 .migration-empty { font-size: 13px; color: var(--muted); padding: 20px; text-align: center; }
+/* Progressive disclosure follows the review task, keeping the existing palette. */
+.workflow-step, .workflow-next { margin-block: 28px; }
+.workflow-details { margin-block: 16px; padding: 18px 20px; border: 1px solid #dbe4ed; border-radius: 12px; }
+.workflow-details > summary { cursor: pointer; font-weight: 600; line-height: 1.6; }
+.workflow-details > summary:focus-visible { outline: 2px solid #1765cc; outline-offset: 5px; }
+.workflow-next { padding: 20px; background: #f3f7fc; border-radius: 12px; }
+.followup-card h4, .followup-card p { overflow-wrap: anywhere; }
+.followup-card details { margin-block: 12px; }
+.followup-card .fact-card { margin-block: 12px; }
+.followup-answer-text { white-space: pre-wrap; }
+@media (max-width: 640px) {
+  .workflow-details { padding: 14px; }
+  .panel-header, .followup-actions { flex-wrap: wrap; gap: 10px; }
+  .followup-answer-area textarea { width: 100%; box-sizing: border-box; }
+}

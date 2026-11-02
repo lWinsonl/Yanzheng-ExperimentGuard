@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from app.services.version_diff import version_diff_service
 
@@ -22,7 +22,7 @@ class ManualLabelRequest(BaseModel):
 
 
 class MigrationAnswerRequest(BaseModel):
-    answer_text: str
+    answer_text: str = Field(min_length=1, max_length=20000)
 
 
 # ---- 版本差异复审 ----

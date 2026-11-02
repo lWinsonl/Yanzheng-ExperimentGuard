@@ -57,6 +57,8 @@ class ReviewService:
             created_at=datetime.now().isoformat(),
         )
         store.add_report(report)
+        if not store.baseline_report_id:
+            store.baseline_report_id = report.report_id
         data_store.persist(session_id)
         return report
 

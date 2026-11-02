@@ -69,6 +69,10 @@ class LlmClient:
 
         last_exc: Exception | None = None
         for attempt in range(retries + 1):
+            from app.access import current_owner, demo_access
+            if not demo_access.allow_model(current_owner.get()):
+                logger.warning("演示服务本小时模型调用额度已用尽，返回未完成状态或练习反馈")
+                return None
             try:
                 req = urllib.request.Request(
                     url,

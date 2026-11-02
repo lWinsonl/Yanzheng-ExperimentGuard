@@ -68,7 +68,7 @@ class RuleExtractor(ExtractorBase):
         (r"(random_state|seed|manual_seed|np\.random\.seed|torch\.manual_seed)\s*[=\(]\s*[\w]+",
          "代码设置了随机种子(单次运行信号)"),
         (r"(重复|运行|实验)[^。\n]{0,6}(\d+)\s*次", "声明重复运行次数"),
-        (r"(mean\s*[±+/-]\s*std|均值\s*[±]\s*标准差|±\s*[\d.]+)", "报告了均值±标准差(多次运行信号)"),
+        (r"(\d+(?:\.\d+)?\s*±\s*\d+(?:\.\d+)?|mean\s*[±+/-]\s*std|均值\s*[±]\s*标准差)", "报告了均值±标准差(多次运行信号)"),
         (r"\bn[_-]?runs\s*=\s*\d+|n_repeats\s*=\s*\d+", "代码指定重复次数"),
     ]
 
@@ -87,6 +87,17 @@ class RuleExtractor(ExtractorBase):
     ]
 
     def extract(self, doc: ParsedDocument, session_id: str) -> Iterable[ExtractedFact]:
+        from app.models.evidence import SourceSpan
+        from app.services.evidence_checks import entity_sets
+
+        if entity_sets(doc.content):
+            yield self.make_fact(
+                session_id=session_id, category=FactCategory.DATA_SPLIT,
+                value=doc.content.strip(),
+                source=SourceSpan(material_id=doc.material_id, start_char=0,
+                                  end_char=len(doc.content), snippet=doc.content),
+                note="显式训练/测试实体编号列表；仅核对所提供列表，不验证日志来源与完整性",
+            )
         if doc.ocr_required and not doc.content:
             # 无可提取文本,不产出事实;审查规则会标为信息不足
             return []

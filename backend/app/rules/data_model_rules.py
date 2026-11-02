@@ -21,6 +21,7 @@ from app.models.evidence import (
 )
 from app.models.review import Finding, FindingLevel
 from app.rules.base import RuleBase
+from app.services.evidence_checks import entity_overlap, observed_repetitions
 
 
 def _to_ref(f: ExtractedFact) -> EvidenceRef:
@@ -100,28 +101,28 @@ class SplitConsistencyRule(RuleBase):
             return [
                 Finding(
                     rule_id=self.rule_id,
-                    level=FindingLevel.CONTRADICTION,
-                    title="计划写按设备/组划分,执行记录为按记录随机划分",
+                    level=FindingLevel.RISK,
+                    title="计划写按设备/组划分，执行出现随机划分线索，需核实输入与分组过程",
                     claim_ids=claim_ids,
                     evidence=_refs(plan_facts) + _refs(exec_facts),
                     missing_evidence=[],
                     suggestion="核对执行代码的划分逻辑:若目标是泛化到新设备,应改为按设备划分(GroupShuffleSplit/groupby)后重新评估。",
                     suggestion_type="fix",
-                    reasoning="计划与执行对数据划分的表述直接冲突:计划为组级划分,执行为记录级随机划分。",
+                    reasoning="train_test_split 也可能用于设备编号；仅凭函数名或随机划分描述不能确定实际划分单位。",
                 )
             ]
         if plan_record and exec_group and not exec_record:
             return [
                 Finding(
                     rule_id=self.rule_id,
-                    level=FindingLevel.CONTRADICTION,
+                    level=FindingLevel.RISK,
                     title="计划写按记录随机划分,执行记录为按设备/组划分",
                     claim_ids=claim_ids,
                     evidence=_refs(plan_facts) + _refs(exec_facts),
                     missing_evidence=[],
                     suggestion="确认实际采用的划分方式,并更新实验计划使两者一致。",
                     suggestion_type="fix",
-                    reasoning="计划与执行对数据划分的表述直接冲突(方向相反)。",
+                    reasoning="存在不同划分方式的线索，需结合完整输入和执行记录核实。",
                 )
             ]
         return []
@@ -167,7 +168,26 @@ class ClaimGeneralizationRule(RuleBase):
             ]
 
         exec_facts = [f for f in split_facts if docs[f.source.material_id].role == MaterialRole.EXECUTION]
-        check_facts = exec_facts or split_facts
+        check_facts = exec_facts
+        checked = [(f, entity_overlap(f, docs)) for f in exec_facts]
+        overlaps = [(f, overlap) for f, overlap in checked if overlap]
+        disjoint = [f for f, overlap in checked if overlap is not None and not overlap]
+        if overlaps:
+            return [Finding(rule_id=self.rule_id, level=FindingLevel.CONTRADICTION,
+                title="提供的训练/测试实体编号存在交集，与未见实体主张冲突",
+                claim_ids=target_ids, evidence=_refs([f for f, _ in overlaps]),
+                missing_evidence=[], suggestion="核对编号记录；按实体隔离后重新评估，或收窄结论。",
+                suggestion_type="fix", reasoning="实际核对所提供的编号列表发现非空交集；不推断其他泄漏途径。")]
+        if disjoint:
+            return []  # 只解除实体交集这一项，不为整个实验背书
+        if not exec_facts:
+            return [Finding(rule_id=self.rule_id, level=FindingLevel.INSUFFICIENT,
+                title="只有计划或缺少实际划分证据，尚不能核实未见实体泛化",
+                claim_ids=target_ids, evidence=_refs(split_facts),
+                missing_evidence=["实际划分代码与训练/测试实体编号列表"],
+                suggestion="补充执行材料；计划中的分组承诺不能代替运行记录。",
+                suggestion_type="clarify", reasoning="计划和实际结果需分别核实。")]
+
 
         has_group = any(_match_any(f.effective_value(), _GROUP_SPLIT_PATTERNS) for f in check_facts)
         has_record = any(_match_any(f.effective_value(), _RECORD_SPLIT_PATTERNS) for f in check_facts)
@@ -176,14 +196,14 @@ class ClaimGeneralizationRule(RuleBase):
             return [
                 Finding(
                     rule_id=self.rule_id,
-                    level=FindingLevel.CONTRADICTION,
-                    title="主张为预测新设备,但执行为记录级随机划分,同设备记录可能同时进入训练与测试集(数据泄漏)",
+                    level=FindingLevel.RISK,
+                    title="执行出现随机划分线索，未核实划分单位与实体交集，存在泄漏风险",
                     claim_ids=target_ids,
                     evidence=_refs(check_facts),
                     missing_evidence=["训练集与测试集的设备编号交集记录(用于确认是否泄漏)"],
                     suggestion="核对训练集与测试集的设备编号是否相交;若目标是预测新设备,改为按设备划分后重新评估。若无法重做,可将结论收窄为“在同一批设备上的表现”。",
                     suggestion_type="fix",
-                    reasoning="记录级随机划分无法保证测试集由未见设备组成,与“预测新设备”的主张直接冲突。",
+                    reasoning="随机划分线索不能证明实际存在重叠；需核对输入单位与实体编号交集。",
                 )
             ]
         if has_group:
@@ -201,7 +221,13 @@ class ClaimGeneralizationRule(RuleBase):
                     reasoning="划分方式正确,但缺少编号交集的直接证据,尚不能完全排除泄漏。",
                 )
             ]
-        return []
+        return [Finding(rule_id=self.rule_id, level=FindingLevel.INSUFFICIENT,
+            title="尚未从执行材料核实实体隔离，需补充编号记录",
+            claim_ids=target_ids, evidence=_refs(check_facts),
+            missing_evidence=["完整训练/测试实体编号列表"],
+            suggestion='可上传 JSON：{"train_entity_ids":["设备A"],"test_entity_ids":["设备B"]}。需使用真实完整的执行编号。',
+            suggestion_type="clarify", reasoning="现有材料不足以确定训练/测试实体是否重叠。")]
+
 
 
 class RepetitionCheckRule(RuleBase):
@@ -222,7 +248,7 @@ class RepetitionCheckRule(RuleBase):
 
         grouped = self.group_by_category(facts)
         rep_facts = grouped.get(FactCategory.REPETITION, [])
-        has_multi = any(_match_any(f.effective_value(), _MULTI_RUN_PATTERNS) for f in rep_facts)
+        has_multi = any(observed_repetitions(f, docs) for f in rep_facts)
         has_seed_only = (
             any("seed" in f.effective_value().lower() or "random_state" in f.effective_value().lower() for f in rep_facts)
             and not has_multi
@@ -291,7 +317,18 @@ class BaselineCheckRule(RuleBase):
                     reasoning="比较主张需要基线在同等条件下的结果才能支持。",
                 )
             ]
+        execution = [f for f in baseline_facts
+                     if docs[f.source.material_id].role == MaterialRole.EXECUTION
+                     and docs[f.source.material_id].origin != "followup_answer"]
+        if not execution:
+            return [Finding(rule_id=self.rule_id, level=FindingLevel.RISK,
+                title="已有基线计划或补充说明，尚缺独立执行材料",
+                claim_ids=target_ids, evidence=_refs(baseline_facts),
+                missing_evidence=["基线配置及相同条件下的实际运行记录"],
+                suggestion="上传可复查的基线代码和结果；补充说明不能代替运行记录。",
+                suggestion_type="clarify", reasoning="区分用户说明、计划承诺与实际执行证据。")]
         return []
+
 
 
 class MetricCheckRule(RuleBase):

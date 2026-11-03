@@ -19,7 +19,7 @@ const STATUS_DISPLAY: Record<DeepReviewStatus, { text: string; cls: string }> = 
     cls: 'warn',
   },
   llm_call_failed: {
-    text: '模型调用失败(超时或网络异常),本次复核未完成,请稍后重试。',
+    text: '模型复核未完成，程序核对结果仍可查看。请检查服务日志，确认是否超时、达到调用限额或配置有误。',
     cls: 'error',
   },
   llm_parse_failed: {
@@ -97,7 +97,7 @@ export function DeepReviewPanel({ sessionId, onResultChange }: Props) {
           {busy ? '复核中…' : result ? '重新复核' : '运行模型复核'}
         </button>
       </div>
-      {busy && <LoadingDots text="模型正在复核复杂上下文" />}
+      {busy && <LoadingDots text="模型正在复核复杂上下文，请保持页面打开" />}
       {error && !busy && (
         <div className="error">复核请求失败:{error}</div>
       )}

@@ -12,6 +12,7 @@ from __future__ import annotations
 import json
 import logging
 import re
+from typing import Literal
 
 from app.config import settings
 
@@ -40,8 +41,9 @@ class LlmClient:
         user_prompt: str,
         temperature: float = 0.2,
         max_tokens: int = 2000,
-        timeout: int = 20,
+        timeout: float | None = None,
         retries: int = 0,
+        thinking: Literal["enabled", "disabled"] | None = None,
     ) -> str | None:
         """调用模型,返回原始文本。失败返回 None(调用方自行降级)。
 
@@ -51,21 +53,27 @@ class LlmClient:
         if not self.is_available():
             return None
         import time
+        import urllib.error
+        import urllib.parse
         import urllib.request
 
         url = settings.llm_base_url.rstrip("/") + "/chat/completions"
-        payload = json.dumps(
-            {
-                "model": settings.llm_model,
-                "messages": [
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": user_prompt},
-                ],
-                "temperature": temperature,
-                "max_tokens": max_tokens,
-            },
-            ensure_ascii=False,
-        ).encode("utf-8")
+        timeout = settings.llm_timeout_seconds if timeout is None else timeout
+        body = {
+            "model": settings.llm_model,
+            "messages": [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt},
+            ],
+            "temperature": temperature,
+            "max_tokens": max_tokens,
+        }
+        # Only send provider-specific parameters to the model we adapted.
+        # Other compatible services keep their existing request format.
+        if (urllib.parse.urlparse(url).hostname == "open.bigmodel.cn"
+                and settings.llm_model.lower() == "glm-4.7-flash"):
+            body["thinking"] = {"type": thinking or settings.llm_thinking}
+        payload = json.dumps(body, ensure_ascii=False).encode("utf-8")
 
         last_exc: Exception | None = None
         for attempt in range(retries + 1):
@@ -83,9 +91,35 @@ class LlmClient:
                     },
                     method="POST",
                 )
+                logger.info("LLM request model=%s timeout=%s max_tokens=%d thinking=%s",
+                            settings.llm_model, timeout, max_tokens,
+                            body.get("thinking", {}).get("type", "provider_default"))
                 with urllib.request.urlopen(req, timeout=timeout) as resp:
                     data = json.loads(resp.read().decode("utf-8"))
-                    return data["choices"][0]["message"]["content"]
+                    choice = data["choices"][0]
+                    logger.info("LLM response model=%s finish_reason=%s",
+                                data.get("model", settings.llm_model), choice.get("finish_reason"))
+                    if choice.get("finish_reason") == "length":
+                        logger.warning("LLM output truncated model=%s max_tokens=%d; result not adopted",
+                                       settings.llm_model, max_tokens)
+                        return None
+                    return choice["message"]["content"]
+            except urllib.error.HTTPError as exc:
+                # Keep credentials, submitted text and provider response bodies
+                # out of logs. A numeric business code is enough to triage 429.
+                code = "unknown"
+                try:
+                    error = json.loads(exc.read(8192).decode("utf-8"))
+                    candidate = error.get("error", {}).get("code")
+                    if str(candidate).isascii() and str(candidate).isdigit():
+                        code = str(candidate)[:10]
+                except (ValueError, UnicodeError, AttributeError, OSError):
+                    pass
+                logger.warning("LLM HTTP failure model=%s status=%s provider_code=%s",
+                               settings.llm_model, exc.code, code)
+                last_exc = exc
+                if attempt < retries:
+                    time.sleep(1.0)
             except Exception as exc:  # noqa: BLE001
                 last_exc = exc
                 if attempt < retries:

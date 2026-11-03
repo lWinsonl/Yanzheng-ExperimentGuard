@@ -1,5 +1,8 @@
 """服务端配置。API 密钥仅存在于服务端环境变量,绝不下发前端。"""
 
+from typing import Literal
+
+from pydantic import Field
 from pydantic_settings import BaseSettings
 
 
@@ -11,6 +14,11 @@ class Settings(BaseSettings):
     llm_api_key: str = ""
     llm_base_url: str = ""
     llm_model: str = ""
+    llm_timeout_seconds: float = Field(default=60, gt=0, le=300)
+    llm_review_timeout_seconds: float = Field(default=120, gt=0, le=300)
+    llm_thinking: Literal["enabled", "disabled"] = "disabled"
+    llm_review_thinking: Literal["enabled", "disabled"] = "enabled"
+    llm_review_max_tokens: int = Field(default=8192, ge=512, le=32768)
 
     # 存储目录(骨架阶段用 JSON 文件持久化)
     data_dir: str = "./data"

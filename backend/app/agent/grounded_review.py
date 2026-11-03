@@ -114,6 +114,7 @@ def parse_proposals(items, context):
 def run_grounded_review(session_id, store, client):
     from app.agent import prompts
     from app.agent.agent_service import DeepReviewResult, MaterialCoverage
+    from app.config import settings
 
     import hashlib
     import json
@@ -137,7 +138,9 @@ def run_grounded_review(session_id, store, client):
     raw = client.chat(prompts.GROUNDED_REVIEW_SYSTEM,
         json.dumps({"claims": [{"claim_id": c.claim_id, "text": c.text} for c in store.session.claims],
                     "review_context": json.loads(context.prompt_text()), "rule_findings": findings}, ensure_ascii=False),
-        max_tokens=2500, timeout=45, retries=0)
+        max_tokens=settings.llm_review_max_tokens,
+        timeout=settings.llm_review_timeout_seconds, retries=0,
+        thinking=settings.llm_review_thinking)
     if snapshot_signature() != signature:
         current = build_context(store)
         common["checks"] = [c.model_dump(mode="json") for c in current.checks]

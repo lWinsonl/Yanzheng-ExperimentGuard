@@ -9,6 +9,7 @@
 
 from __future__ import annotations
 
+import logging
 from pathlib import Path
 
 from fastapi import FastAPI
@@ -18,6 +19,8 @@ from fastapi.staticfiles import StaticFiles
 from app.api import ALL_ROUTERS
 from app.config import settings
 from app.access import demo_access
+
+logging.basicConfig(level=logging.INFO, format="%(levelname)s:%(name)s:%(message)s")
 
 app = FastAPI(title=settings.app_name, version="0.1.0")
 app.middleware("http")(demo_access.middleware)

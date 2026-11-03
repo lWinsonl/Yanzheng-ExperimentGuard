@@ -65,3 +65,23 @@ def test_model_failure_keeps_submitted_materials_and_reports(client, monkeypatch
     assert client.post(prefix + "/agent/deep-review").json()["status"] == "llm_call_failed"
     assert len(client.get(prefix + "/materials").json()) == 1
     assert before["report_id"] in data_store.require(sid).reports
+
+
+def test_deep_review_uses_its_configured_wait_and_thinking_budget(client, monkeypatch):
+    from app.config import settings
+    sid = make_session(client)
+    upload_text(client, sid, "评价指标为F1。", "record.txt")
+    monkeypatch.setattr(settings, "llm_review_timeout_seconds", 110)
+    monkeypatch.setattr(settings, "llm_review_max_tokens", 7000)
+    monkeypatch.setattr(settings, "llm_review_thinking", "enabled")
+    monkeypatch.setattr(llm_client, "is_available", lambda: True)
+    calls = []
+
+    def chat(*args, **kwargs):
+        calls.append(kwargs)
+        return '{"deep_findings": []}'
+
+    monkeypatch.setattr(llm_client, "chat", chat)
+    result = client.post(f"/api/sessions/{sid}/agent/deep-review").json()
+    assert result["status"] == "ok_no_findings"
+    assert calls == [{"max_tokens": 7000, "timeout": 110, "retries": 0, "thinking": "enabled"}]

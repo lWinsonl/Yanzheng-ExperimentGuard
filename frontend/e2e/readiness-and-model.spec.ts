@@ -6,34 +6,21 @@ async function reachUpload(page: Page) {
   await page.getByRole('button', { name: '下一步:上传材料', exact: true }).click()
 }
 
-test('empty upload shows preparation without running gap analysis; pending facts are not missing', async ({ page }) => {
+test('upload proceeds to fact confirmation without redundant cards or gap requests', async ({ page }) => {
   let gapCalls = 0
   page.on('request', request => { if (request.url().endsWith('/agent/gaps')) gapCalls++ })
   await reachUpload(page)
-  await expect(page.getByRole('region', { name: '材料准备' })).toContainText('暂不判断材料缺口')
   await expect(page.getByRole('button', { name: '下一步:确认提取的事实' })).toBeDisabled()
   await expect(page.getByText('材料缺口分析', { exact: true })).toHaveCount(0)
   expect(gapCalls).toBe(0)
   await page.locator('.upload-area.execution input[type=file]').setInputFiles({
     name: 'result.log', mimeType: 'text/plain', buffer: Buffer.from('F1=0.8'),
   })
-  await expect(page.getByText('材料已收到，等待核对事实', { exact: true })).toBeVisible()
-  await expect(page.locator('.gap-status')).toContainText('未确认不等于材料缺失')
-  await expect(page.locator('.gap-status .gap-item')).toHaveCount(0)
-  await expect(page.locator('.gap-status .success')).toHaveCount(0)
-  expect(gapCalls).toBeGreaterThan(0)
-})
-
-test('unknown sufficiency and an empty gap list do not claim materials are sufficient', async ({ page }) => {
-  await reachUpload(page)
-  await page.route('**/agent/gaps', route => route.fulfill({ json: {
-    phase: 'analyzed', sufficiency: 'unknown', gaps: [], summary: '目前无法判断', source: 'heuristic',
-  } }))
-  await page.locator('.upload-area.execution input[type=file]').setInputFiles({
-    name: 'record.txt', mimeType: 'text/plain', buffer: Buffer.from('A plain record.'),
-  })
-  await expect(page.locator('.gap-status')).toContainText('目前无法确定材料是否充足')
-  await expect(page.locator('.gap-status .success')).toHaveCount(0)
+  await expect(page.locator('.material-list')).toContainText('result.log')
+  await expect(page.locator('.gap-status')).toHaveCount(0)
+  await page.getByRole('button', { name: '下一步:确认提取的事实' }).click()
+  await expect(page.getByRole('button', { name: /全部确认/ })).toBeVisible()
+  expect(gapCalls).toBe(0)
 })
 
 test('specific model error is visible and fallback only runs on explicit click', async ({ page }) => {

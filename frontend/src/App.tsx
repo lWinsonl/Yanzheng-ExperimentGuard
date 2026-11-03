@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { AgentStatus, ReviewSession } from './types'
 import { getAgentStatus, getSession } from './api'
 import { SetupPage } from './pages/SetupPage'
@@ -6,6 +6,7 @@ import { UploadPage } from './pages/UploadPage'
 import { FactConfirmPage } from './pages/FactConfirmPage'
 import { ReportPage } from './pages/ReportPage'
 import { RecheckPage } from './pages/RecheckPage'
+import { SessionHistory } from './components/SessionHistory'
 
 type Step = 'setup' | 'upload' | 'facts' | 'report' | 'recheck'
 
@@ -41,6 +42,8 @@ function loadStep(): Step {
 export default function App() {
   const [step, setStep] = useState<Step>(() => loadSession() ? loadStep() : 'setup')
   const [session, setSession] = useState<ReviewSession | null>(loadSession)
+  const [showHistory, setShowHistory] = useState(false)
+  const sessionIntent = useRef(0)
   const [agentResult, setAgentResult] = useState<{ sessionId: string; value: AgentStatus } | null>(null)
   const sessionId = session?.session_id
   const agentStatus = agentResult?.sessionId === sessionId ? agentResult?.value : null
@@ -60,10 +63,17 @@ export default function App() {
   useEffect(() => {
     const restored = loadSession()
     if (!restored) return
-    getSession(restored.session_id).then(setSession).catch(() => {
-      setSession(null)
-      setStep('setup')
+    const intent = sessionIntent.current
+    let active = true
+    getSession(restored.session_id).then(value => {
+      if (active && sessionIntent.current === intent) setSession(value)
+    }).catch(() => {
+      if (active && sessionIntent.current === intent) {
+        setSession(null)
+        setStep('setup')
+      }
     })
+    return () => { active = false }
   }, [])
 
   useEffect(() => {
@@ -74,6 +84,7 @@ export default function App() {
   }, [sessionId])
 
   function startNew() {
+    sessionIntent.current++
     setSession(null)
     setStep('setup')
   }
@@ -98,6 +109,7 @@ export default function App() {
         <p className="tagline">
           审查你的研究结论能否被实验支持 —— 主张、计划与执行逐项对照
         </p>
+        <div className="header-actions">
         {agentStatus && (
           <span
             className={`mode-badge ${agentStatus.mode}`}
@@ -106,12 +118,23 @@ export default function App() {
             {agentStatus.mode === 'llm' ? '模型模式' : '启发式模式'}
           </span>
         )}
+        <button onClick={() => setShowHistory(true)}>历史会话</button>
         {session && (
           <button className="new-session-btn" onClick={startNew}>
             新建审查
           </button>
         )}
+        </div>
       </header>
+
+      {showHistory && <SessionHistory currentSessionId={sessionId}
+        onClose={() => setShowHistory(false)}
+        onOpen={value => {
+          sessionIntent.current++
+          setSession(value)
+          setStep('upload')
+          setShowHistory(false)
+        }} />}
 
       <nav className="stepper">
         {STEPS.map((s, i) => {
@@ -136,12 +159,8 @@ export default function App() {
       <main className="app-main">
         {step === 'setup' && (
           <SetupPage
-            onCreated={(s) => setSession(s)}
+            onCreated={(s) => { sessionIntent.current++; setSession(s) }}
             onNext={() => setStep('upload')}
-            onOpenSession={(s) => {
-              setSession(s)
-              setStep('upload')
-            }}
           />
         )}
         {step === 'upload' && session && (

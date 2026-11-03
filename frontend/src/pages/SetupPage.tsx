@@ -1,25 +1,19 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import type { DirectionAnalysis, ExperimentType, ReviewSession } from '../types'
-import { analyzeDirection, createSession, listSessions } from '../api'
+import { analyzeDirection, createSession } from '../api'
 import { DEMO_CLAIMS, DEMO_TITLE } from '../demo-data'
 import { LoadingDots } from '../components/LoadingDots'
 
 interface Props {
   onCreated: (session: ReviewSession) => void
   onNext: () => void
-  onOpenSession: (session: ReviewSession) => void
-}
-
-const EXP_TYPE_LABEL: Record<string, string> = {
-  data_model: '数据与模型实验',
-  algorithm_system: '算法与系统性能实验',
 }
 
 /** 第一步:确定审查范围——实验类型 + 研究主张。
  * 创建会话后自动运行方向审查,告诉用户"你的主张需要什么实验设计",
  * 引导用户上传对的材料。
  */
-export function SetupPage({ onCreated, onNext, onOpenSession }: Props) {
+export function SetupPage({ onCreated, onNext }: Props) {
   const [title, setTitle] = useState('')
   const [expType, setExpType] = useState<ExperimentType>('data_model')
   const [claimsText, setClaimsText] = useState(
@@ -30,14 +24,6 @@ export function SetupPage({ onCreated, onNext, onOpenSession }: Props) {
   const [session, setSession] = useState<ReviewSession | null>(null)
   const [direction, setDirection] = useState<DirectionAnalysis | null>(null)
   const [dirBusy, setDirBusy] = useState(false)
-  const [history, setHistory] = useState<ReviewSession[]>([])
-  const [showHistory, setShowHistory] = useState(false)
-
-  useEffect(() => {
-    listSessions()
-      .then((list) => setHistory(list.filter((s) => s.title).slice(0, 10)))
-      .catch(() => {})
-  }, [])
 
   function loadDemo() {
     setTitle(DEMO_TITLE)
@@ -139,43 +125,6 @@ export function SetupPage({ onCreated, onNext, onOpenSession }: Props) {
           <button disabled={busy} onClick={loadDemo} title="一键填入演示数据">
             加载示例
           </button>
-        </div>
-      )}
-
-      {/* 历史会话:默认折叠,点击按钮展开选择 */}
-      {!session && history.length > 0 && (
-        <div className="session-history">
-          {showHistory ? (
-            <>
-              <div className="agent-section-header">
-                <h4>历史审查会话</h4>
-                <button onClick={() => setShowHistory(false)}>收起</button>
-              </div>
-              {history.map((s) => (
-                <div
-                  key={s.session_id}
-                  className="session-history-item"
-                  onClick={() => onOpenSession(s)}
-                  title="点击继续此审查"
-                >
-                  <span className="session-history-title">
-                    {s.title || '(无标题)'}
-                  </span>
-                  <span className="session-history-meta">
-                    {EXP_TYPE_LABEL[s.experiment_type] ?? s.experiment_type}
-                    {' · '}
-                    {s.claims.length} 条主张
-                    {' · '}
-                    {new Date(s.created_at).toLocaleDateString('zh-CN')}
-                  </span>
-                </div>
-              ))}
-            </>
-          ) : (
-            <button onClick={() => setShowHistory(true)}>
-              查看历史审查会话({history.length})
-            </button>
-          )}
         </div>
       )}
 

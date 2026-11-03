@@ -28,8 +28,9 @@ body {
 
 .app-header { text-align: center; margin-bottom: 20px; position: relative; }
 .app-header h1 { font-size: 28px; letter-spacing: 2px; }
-.new-session-btn { position: absolute; top: 0; right: 0; font-size: 13px; padding: 4px 12px; }
-.mode-badge { position: absolute; top: 2px; right: 110px; font-size: 12px; padding: 3px 10px; border-radius: 10px; font-weight: 600; white-space: nowrap; }
+.header-actions { display: flex; justify-content: center; align-items: center; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+.new-session-btn { font-size: 13px; padding: 4px 12px; }
+.mode-badge { font-size: 12px; padding: 3px 10px; border-radius: 10px; font-weight: 600; white-space: nowrap; }
 .mode-badge.llm { background: #e6f4ea; color: #188038; }
 .mode-badge.heuristic { background: #f1f3f4; color: #5f6368; }
 .tagline { color: var(--muted); font-size: 14px; }
@@ -153,11 +154,13 @@ button.primary:hover:not(:disabled) { background: #1765cc; }
 @keyframes loading-pulse { 0%, 80%, 100% { opacity: 0.25; transform: scale(0.7); } 40% { opacity: 1; transform: scale(1); } }
 
 /* 历史会话列表 */
-.session-history { margin-top: 24px; text-align: left; }
-.session-history h4 { margin-bottom: 8px; }
-.session-history-item { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border: 1px solid var(--border); border-radius: var(--radius); margin-bottom: 6px; cursor: pointer; background: #fff; transition: border-color 0.15s; }
+.history-dialog { width: min(720px, calc(100% - 32px)); max-height: calc(100dvh - 48px); padding: 24px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--card); color: var(--text); box-sizing: border-box; }
+.history-dialog::backdrop { background: rgb(0 0 0 / 35%); }
+.history-dialog h2 { margin: 0; font-size: 20px; }
+.session-history-list { margin-top: 16px; }
+.session-history-item { display: flex; width: 100%; text-align: left; flex-wrap: wrap; align-items: center; gap: 10px; padding: 10px 12px; border: 1px solid var(--border); border-radius: var(--radius); margin-bottom: 6px; cursor: pointer; background: #fff; transition: border-color 0.15s; }
 .session-history-item:hover { border-color: var(--primary); background: #f8fbff; }
-.session-history-title { font-weight: 600; font-size: 14px; flex: 1; }
+.session-history-title { font-weight: 600; font-size: 14px; flex: 1; min-width: 0; overflow-wrap: anywhere; }
 .session-history-meta { font-size: 12px; color: var(--muted); }
 
 /* 上传区域(计划/执行双列) */

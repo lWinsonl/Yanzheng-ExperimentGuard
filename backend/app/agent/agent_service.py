@@ -50,6 +50,7 @@ class GapAnalysis:
     gaps: list[dict] = field(default_factory=list)
     summary: str = ""
     source: str = "heuristic"
+    phase: str = "analyzed"  # awaiting_materials / awaiting_confirmation / analyzed
 
 
 @dataclass
@@ -117,6 +118,11 @@ class DeepReviewResult:
     evidence_catalog: list[dict] = field(default_factory=list)
     unverified: list[dict] = field(default_factory=list)
     validation_note: str = ""
+    requested_model: str = ""
+    response_model: str = ""
+    fallback_model: str = ""
+    used_fallback: bool = False
+    call_error: dict | None = None
 
 
 @dataclass
@@ -209,6 +215,10 @@ class AgentService:
         """判断当前材料是否足以审查,还缺什么。模型优先,启发式降级。"""
         store = data_store.require(session_id)
         session = store.session
+        if not store.docs:
+            return GapAnalysis(phase="awaiting_materials", summary="尚未上传材料，暂不判断材料缺口。请先提供实验计划和实际执行材料。")
+        if any(f.status.value == "pending_user_confirm" for f in store.facts.values()):
+            return GapAnalysis(phase="awaiting_confirmation", summary="材料已收到，提取的信息尚待确认。请先到第三步核对事实；未确认不等于材料缺失。")
         claims_text = "\n".join(f"- {c.text}" for c in session.claims)
 
         materials_desc = self._describe_materials(store)
@@ -255,23 +265,24 @@ class AgentService:
                 "reason": "没有执行材料,无法核实主张是否被实际实验支持",
                 "how_to_provide": "上传代码、配置或运行结果,标记为'执行'",
             })
-        if has_plan and has_exec and "data_split" not in categories:
+        if (session.experiment_type == ExperimentType.DATA_MODEL
+                and has_plan and has_exec and "data_split" not in categories):
             gaps.append({
                 "missing": "数据划分方式说明",
                 "priority": "high",
-                "reason": "无法核实测试集构成,泛化类主张无法审查",
-                "how_to_provide": "在计划或代码中明确数据如何划分",
+                "reason": "尚未从已确认事实中核实测试集构成，不代表原材料一定没有相关信息。",
+                "how_to_provide": "先核对原文与提取结果，必要时补充数据划分说明",
             })
         if "metric" not in categories:
             gaps.append({
                 "missing": "评价指标",
                 "priority": "medium",
-                "reason": "没有指标,任何'更好/更差'的结论都无法核实",
-                "how_to_provide": "明确评价指标(如 F1、AUC、RMSE)及数值",
+                "reason": "尚未从已确认事实中核实评价指标，不代表原材料一定没有指标。",
+                "how_to_provide": "先核对原文与提取结果，必要时补充评价指标及数值",
             })
 
         sufficiency = "sufficient" if not gaps else ("partial" if has_plan or has_exec else "insufficient")
-        summary = f"启发式分析:已上传 {len(store.docs)} 份材料,发现 {len(gaps)} 个缺口。接入模型可获得更深入分析。"
+        summary = f"基于已确认事实的规则清单：已上传 {len(store.docs)} 份材料，发现 {len(gaps)} 项待补充或核实的内容。这不是实验质量的完整结论。"
         return GapAnalysis(sufficiency=sufficiency, gaps=gaps, summary=summary, source="heuristic")
 
     # ---- 3. 自主追问 ----
@@ -412,10 +423,10 @@ class AgentService:
 
     # ---- 4. 模型复核(复杂上下文,引用校验) ----
 
-    def deep_review(self, session_id: str) -> DeepReviewResult:
+    def deep_review(self, session_id: str, use_fallback: bool = False) -> DeepReviewResult:
         """ID-bound proposals plus full-record program checks; no free filename repair."""
         from app.agent.grounded_review import run_grounded_review
-        return run_grounded_review(session_id, data_store.require(session_id), llm_client)
+        return run_grounded_review(session_id, data_store.require(session_id), llm_client, use_fallback=use_fallback)
 
     def _parse_deep_findings(
         self, store: SessionStore, items: list

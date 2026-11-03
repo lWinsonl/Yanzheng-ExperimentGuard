@@ -197,7 +197,7 @@ function UploadArea({
  */
 export function UploadPage({ sessionId, onNext, onBack }: Props) {
   const [materials, setMaterials] = useState<MaterialMeta[]>([])
-  const [gaps, setGaps] = useState<GapAnalysis | null>(null)
+  const [gapResponse, setGapResponse] = useState<{ version: string; value: GapAnalysis } | null>(null)
 
   const refresh = useCallback(async () => {
     const value = await listMaterials(sessionId)
@@ -213,11 +213,14 @@ export function UploadPage({ sessionId, onNext, onBack }: Props) {
   }, [sessionId])
 
   const materialVersion = materials.map((m) => m.material_id).join(',')
+  const gapVersion = `${sessionId}:${materialVersion}`
+  const gaps = gapResponse?.version === gapVersion ? gapResponse.value : null
   useEffect(() => {
+    if (!materialVersion) return
     let active = true
-    analyzeGaps(sessionId).then((value) => { if (active) setGaps(value) }).catch(() => {})
+    analyzeGaps(sessionId).then((value) => { if (active) setGapResponse({ version: gapVersion, value }) }).catch(() => {})
     return () => { active = false }
-  }, [sessionId, materialVersion])
+  }, [sessionId, materialVersion, gapVersion])
 
   const planMaterials = materials.filter((m) => m.role === 'plan')
   const execMaterials = materials.filter((m) => m.role === 'execution')
@@ -228,10 +231,10 @@ export function UploadPage({ sessionId, onNext, onBack }: Props) {
     low: '#1a73e8',
   }
   const sufficiencyLabel: Record<string, string> = {
-    sufficient: '材料充足',
-    partial: '部分充足',
-    insufficient: '材料不足',
-    unknown: '未知',
+    sufficient: '基础清单已覆盖',
+    partial: '有待核实项',
+    insufficient: '有待补充项',
+    unknown: '尚无法判断',
   }
 
   return (
@@ -289,18 +292,26 @@ export function UploadPage({ sessionId, onNext, onBack }: Props) {
         </div>
       )}
 
-      {/* 缺口分析:自动刷新,告诉用户还缺什么 */}
-      {gaps && (
+      {materials.length === 0 && <section className="gap-status" aria-label="材料准备">
+        <strong>等待上传材料</strong>
+        <p>尚未上传材料，暂不判断材料缺口。请先提供实验计划和实际执行材料。</p>
+      </section>}
+
+      {/* 未确认的信息不能被当成缺失；只有实际分析完成才展示结论。 */}
+      {materials.length > 0 && gaps && (
         <div className="gap-status">
           <div className="agent-section-header">
-            <span>🤖 材料缺口分析</span>
+            <span>{gaps.phase === 'awaiting_confirmation' ? '材料已收到，等待核对事实' : '材料缺口分析'}</span>
             <span className={`agent-tag suf-${gaps.sufficiency}`}>
-              {sufficiencyLabel[gaps.sufficiency] ?? gaps.sufficiency}
+              {gaps.phase === 'awaiting_confirmation' ? '待确认' : (sufficiencyLabel[gaps.sufficiency] ?? gaps.sufficiency)}
             </span>
           </div>
-          {gaps.gaps.length === 0 ? (
-            <div className="success">
-              材料覆盖了已审查维度的基本要求,可以进入下一步确认事实。
+          {gaps.summary && <p className="muted">{gaps.summary}</p>}
+          {gaps.phase === 'awaiting_confirmation' || gaps.phase === 'awaiting_materials' ? null : gaps.gaps.length === 0 ? (
+            <div className={gaps.sufficiency === 'sufficient' ? 'success' : 'muted'}>
+              {gaps.sufficiency === 'sufficient'
+                ? '已核对的材料清单暂未发现缺项，仍需运行后续审查。'
+                : '目前无法确定材料是否充足，请核对提取事实和原始材料。'}
             </div>
           ) : (
             <div className="agent-subsection">
@@ -324,7 +335,7 @@ export function UploadPage({ sessionId, onNext, onBack }: Props) {
 
       <div className="page-actions">
         <button onClick={onBack}>上一步</button>
-        <button className="primary" onClick={onNext}>
+        <button className="primary" onClick={onNext} disabled={materials.length === 0}>
           下一步:确认提取的事实
         </button>
       </div>

@@ -111,10 +111,12 @@ def parse_proposals(items, context):
     return accepted, unverified
 
 
-def run_grounded_review(session_id, store, client):
+def run_grounded_review(session_id, store, client, use_fallback=False):
     from app.agent import prompts
     from app.agent.agent_service import DeepReviewResult, MaterialCoverage
     from app.config import settings
+    from app.agent.call_diagnostics import capture_call_diagnostics, ModelCallError
+    from urllib.parse import urlparse
 
     import hashlib
     import json
@@ -126,29 +128,48 @@ def run_grounded_review(session_id, store, client):
         }, ensure_ascii=False, sort_keys=True).encode()).hexdigest()
     signature = snapshot_signature()
     context = build_context(store)
+    fallback = settings.llm_fallback_model
+    if (not fallback and settings.llm_model.lower() == "glm-4.7-flash"
+            and urlparse(settings.llm_base_url).hostname == "open.bigmodel.cn"):
+        fallback = "glm-4-flash"
+    if fallback == settings.llm_model:
+        fallback = ""
+    model = fallback if use_fallback else settings.llm_model
     common = dict(coverage=[MaterialCoverage(**c) for c in context.coverage],
                   checks=[c.model_dump(mode="json") for c in context.checks],
                   evidence_catalog=[asdict(e) for e in context.evidence],
+                  requested_model=model, fallback_model=fallback, used_fallback=use_fallback,
                   validation_note="程序结果仅针对已确认的提供记录；模型证据绑定通过不代表推理正确，建议执行后仍需新记录验证。")
+    if use_fallback and not fallback:
+        return DeepReviewResult(status="llm_call_failed", message="未配置可用的备用模型，本次未发送模型请求。",
+            call_error=asdict(ModelCallError("unconfigured", "请管理员先配置备用模型。")), **common)
+    if not store.docs:
+        return DeepReviewResult(status="needs_evidence", message="尚未上传材料，无法进行模型复核。请先上传并确认事实。", **common)
     if not client.is_available():
         return DeepReviewResult(status="llm_unavailable", message="未配置模型服务；可先查看程序核对结果。", **common)
     report = store.latest_report()
     findings = [{"rule_id": f.rule_id, "level": f.level.value, "title": f.title,
                  "reasoning": f.reasoning[:500]} for f in report.findings] if report else []
-    raw = client.chat(prompts.GROUNDED_REVIEW_SYSTEM,
-        json.dumps({"claims": [{"claim_id": c.claim_id, "text": c.text} for c in store.session.claims],
-                    "review_context": json.loads(context.prompt_text()), "rule_findings": findings}, ensure_ascii=False),
-        max_tokens=settings.llm_review_max_tokens,
-        timeout=settings.llm_review_timeout_seconds, retries=0,
-        thinking=settings.llm_review_thinking)
+    options = {"model": model} if use_fallback else {}
+    with capture_call_diagnostics() as diagnostics:
+        raw = client.chat(prompts.GROUNDED_REVIEW_SYSTEM,
+            json.dumps({"claims": [{"claim_id": c.claim_id, "text": c.text} for c in store.session.claims],
+                        "review_context": json.loads(context.prompt_text()), "rule_findings": findings}, ensure_ascii=False),
+            max_tokens=settings.llm_review_max_tokens,
+            timeout=settings.llm_review_timeout_seconds, retries=0,
+            thinking=settings.llm_review_thinking, **options)
+    common["response_model"] = diagnostics.response_model
     if snapshot_signature() != signature:
         current = build_context(store)
         common["checks"] = [c.model_dump(mode="json") for c in current.checks]
         common["evidence_catalog"] = []
         return DeepReviewResult(status="needs_evidence", message="复核期间材料、主张或事实状态已改变；旧模型输出未采用，程序结果已更新，请重新复核。",
             unverified=[{"title": "材料已改变", "reason": "旧输出不能用于当前版本，未采用任何修改操作。"}], llm_available=True, **common)
-    if raw is None:
-        return DeepReviewResult(status="llm_call_failed", message="模型调用未完成，已保留程序核对结果。", llm_available=True, **common)
+    if not raw:
+        failure = diagnostics.error
+        return DeepReviewResult(status="llm_call_failed",
+            message=failure.message if failure else "模型调用未完成，已保留程序核对结果。",
+            call_error=asdict(failure) if failure else None, llm_available=True, **common)
     data = client.parse_json_response(raw)
     if not isinstance(data, dict) or not isinstance(data.get("deep_findings"), list):
         return DeepReviewResult(status="llm_parse_failed", message="模型输出格式无效；未采用其中的修改操作，程序结果仍可查看。", llm_available=True, **common)

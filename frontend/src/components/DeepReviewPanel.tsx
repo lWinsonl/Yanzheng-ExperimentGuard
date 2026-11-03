@@ -72,11 +72,11 @@ export function DeepReviewPanel({ sessionId, onResultChange }: Props) {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  async function run() {
+  async function run(useFallback = false) {
     setBusy(true)
     setError(null)
     try {
-      const res = await deepReview(sessionId)
+      const res = await deepReview(sessionId, useFallback)
       setResult(res)
       onResultChange?.(res)
     } catch (e) {
@@ -88,12 +88,13 @@ export function DeepReviewPanel({ sessionId, onResultChange }: Props) {
 
   const findings = result?.findings ?? []
   const statusInfo = result ? STATUS_DISPLAY[result.status] : null
+  const statusText = result?.message || statusInfo?.text
 
   return (
     <div className="deep-review-panel">
       <div className="agent-section-header">
         <span>模型复核与待验证建议</span>
-        <button disabled={busy} onClick={run}>
+        <button disabled={busy} onClick={() => run()}>
           {busy ? '复核中…' : result ? '重新复核' : '运行模型复核'}
         </button>
       </div>
@@ -101,9 +102,22 @@ export function DeepReviewPanel({ sessionId, onResultChange }: Props) {
       {error && !busy && (
         <div className="error">复核请求失败:{error}</div>
       )}
-      {result && !busy && statusInfo && statusInfo.text && (
-        <div className={statusInfo.cls}>{statusInfo.text}</div>
+      {result && !busy && statusInfo && statusText && (
+        <div className={statusInfo.cls} role={statusInfo.cls === 'error' ? 'alert' : undefined}>
+          {statusText}
+          {result.call_error?.provider_code && <span>（服务错误码：{result.call_error.provider_code}）</span>}
+        </div>
       )}
+      {result && !busy && result.requested_model && <p className="muted">
+        请求模型：{result.requested_model}；
+        {result.response_model ? `响应模型：${result.response_model}` : '尚未取得有效模型响应'}
+        {result.used_fallback && '。本次手动使用备用模型，建议仍需核对。'}
+      </p>}
+      {result?.status === 'llm_call_failed' && result.fallback_model && !result.used_fallback
+        && result.call_error?.retryable && !busy && <div>
+          <p className="muted">可以手动尝试备用模型；备用模型不保证更准确或一定可用。</p>
+          <button onClick={() => run(true)}>使用备用模型 {result.fallback_model} 复核</button>
+        </div>}
       {result && !busy && result.coverage.length > 0 && (
         <CoveragePanel coverage={result.coverage} />
       )}

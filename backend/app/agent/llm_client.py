@@ -15,6 +15,10 @@ import re
 from typing import Literal
 
 from app.config import settings
+from app.agent.call_diagnostics import (
+    ModelCallError, exception_failure, http_failure,
+    record_failure, record_request, record_success,
+)
 
 logger = logging.getLogger("llm_client")
 
@@ -44,13 +48,17 @@ class LlmClient:
         timeout: float | None = None,
         retries: int = 0,
         thinking: Literal["enabled", "disabled"] | None = None,
+        model: str | None = None,
     ) -> str | None:
         """调用模型,返回原始文本。失败返回 None(调用方自行降级)。
 
         retries: 失败后重试次数(0=不重试)。重试间隔 1 秒,
         用于应对偶发超时/网络抖动——竞赛演示场景建议 deep_review 等长任务设 1-2。
         """
+        model_name = model or settings.llm_model
+        record_request(model_name)
         if not self.is_available():
+            record_failure(ModelCallError("unconfigured", "尚未配置完整的模型服务。"))
             return None
         import time
         import urllib.error
@@ -60,7 +68,7 @@ class LlmClient:
         url = settings.llm_base_url.rstrip("/") + "/chat/completions"
         timeout = settings.llm_timeout_seconds if timeout is None else timeout
         body = {
-            "model": settings.llm_model,
+            "model": model_name,
             "messages": [
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_prompt},
@@ -71,7 +79,7 @@ class LlmClient:
         # Only send provider-specific parameters to the model we adapted.
         # Other compatible services keep their existing request format.
         if (urllib.parse.urlparse(url).hostname == "open.bigmodel.cn"
-                and settings.llm_model.lower() == "glm-4.7-flash"):
+                and model_name.lower() == "glm-4.7-flash"):
             body["thinking"] = {"type": thinking or settings.llm_thinking}
         payload = json.dumps(body, ensure_ascii=False).encode("utf-8")
 
@@ -80,6 +88,7 @@ class LlmClient:
             from app.access import current_owner, demo_access
             if not demo_access.allow_model(current_owner.get()):
                 logger.warning("演示服务本小时模型调用额度已用尽，返回未完成状态或练习反馈")
+                record_failure(ModelCallError("demo_limit", "演示服务本小时模型调用额度已用尽，请稍后再试。"))
                 return None
             try:
                 req = urllib.request.Request(
@@ -92,18 +101,24 @@ class LlmClient:
                     method="POST",
                 )
                 logger.info("LLM request model=%s timeout=%s max_tokens=%d thinking=%s",
-                            settings.llm_model, timeout, max_tokens,
+                            model_name, timeout, max_tokens,
                             body.get("thinking", {}).get("type", "provider_default"))
                 with urllib.request.urlopen(req, timeout=timeout) as resp:
                     data = json.loads(resp.read().decode("utf-8"))
                     choice = data["choices"][0]
                     logger.info("LLM response model=%s finish_reason=%s",
-                                data.get("model", settings.llm_model), choice.get("finish_reason"))
+                                data.get("model", model_name), choice.get("finish_reason"))
                     if choice.get("finish_reason") == "length":
                         logger.warning("LLM output truncated model=%s max_tokens=%d; result not adopted",
-                                       settings.llm_model, max_tokens)
+                                       model_name, max_tokens)
+                        record_failure(ModelCallError("output_truncated", "模型输出达到预算上限，结果不完整，本次复核未采用这些内容。"))
                         return None
-                    return choice["message"]["content"]
+                    content = choice["message"]["content"]
+                    if not isinstance(content, str) or not content.strip():
+                        record_failure(ModelCallError("empty_response", "模型未返回可用的正文，本次复核未完成。"))
+                        return None
+                    record_success(str(data.get("model", model_name))[:120])
+                    return content
             except urllib.error.HTTPError as exc:
                 # Keep credentials, submitted text and provider response bodies
                 # out of logs. A numeric business code is enough to triage 429.
@@ -116,12 +131,14 @@ class LlmClient:
                 except (ValueError, UnicodeError, AttributeError, OSError):
                     pass
                 logger.warning("LLM HTTP failure model=%s status=%s provider_code=%s",
-                               settings.llm_model, exc.code, code)
+                               model_name, exc.code, code)
+                record_failure(http_failure(exc.code, code))
                 last_exc = exc
                 if attempt < retries:
                     time.sleep(1.0)
             except Exception as exc:  # noqa: BLE001
                 last_exc = exc
+                record_failure(exception_failure(exc))
                 if attempt < retries:
                     logger.warning(
                         "LLM 调用失败(第 %d 次),%.0f 秒后重试:%s",

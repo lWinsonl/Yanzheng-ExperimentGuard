@@ -63,14 +63,14 @@ def generate_followups(session_id: str):
 
 
 @router.post("/deep-review")
-def deep_review(session_id: str):
+def deep_review(session_id: str, use_fallback: bool = False):
     """模型复核:返回 DeepReviewResult(状态+发现+覆盖范围)。
 
     status 区分:ok / ok_no_findings / llm_unavailable / llm_call_failed / llm_parse_failed
     coverage 记录每份材料的实际检查范围(长文档截断时明示)。
     """
     try:
-        result = agent_service.deep_review(session_id)
+        result = agent_service.deep_review(session_id, use_fallback=use_fallback)
         return _dataclass_to_dict(result)
     except KeyError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc

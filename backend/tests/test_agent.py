@@ -85,17 +85,15 @@ def test_heuristic_gap_analysis():
 
 
 def test_heuristic_gap_analysis_empty_session():
-    """空会话(无材料)应报高优先级缺口。"""
+    """空会话等待上传，不把尚未提供材料说成审查发现。"""
     session = evidence_chain.create_session(
         title="空会话", experiment_type="data_model", claim_texts=[CLAIM]
     )
     result = agent_service.analyze_gaps(session.session_id)
 
-    high_gaps = [g for g in result.gaps if g["priority"] == "high"]
-    gap_names = " ".join(g["missing"] for g in result.gaps)
-    assert "实验计划" in gap_names, "应报缺计划材料"
-    assert "执行" in gap_names, "应报缺执行材料"
-    assert len(high_gaps) >= 2, "缺计划和执行应都是高优先级"
+    assert result.phase == "awaiting_materials"
+    assert result.sufficiency == "unknown"
+    assert result.gaps == []
 
 
 def _setup_for_followups():

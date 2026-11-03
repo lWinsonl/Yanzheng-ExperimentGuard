@@ -194,6 +194,7 @@ export interface GapAnalysis {
   gaps: { missing: string; priority: string; reason: string; how_to_provide: string }[]
   summary: string
   source: 'heuristic' | 'llm'
+  phase?: 'awaiting_materials' | 'awaiting_confirmation' | 'analyzed'
 }
 
 export interface Followup {
@@ -288,6 +289,17 @@ export interface DeepReviewResult {
   evidence_catalog?: ReviewEvidence[]
   unverified?: { title: string; reason: string }[]
   validation_note?: string
+  requested_model?: string
+  response_model?: string
+  fallback_model?: string
+  used_fallback?: boolean
+  call_error?: {
+    kind: string
+    message: string
+    retryable: boolean
+    http_status: number | null
+    provider_code: string
+  } | null
 }
 
 export interface TeachingCase {

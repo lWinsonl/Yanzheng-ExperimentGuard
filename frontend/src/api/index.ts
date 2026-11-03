@@ -174,8 +174,8 @@ export function generateFollowups(
   return request(`/sessions/${sessionId}/agent/followups`, { method: 'POST' })
 }
 
-export function deepReview(sessionId: string): Promise<DeepReviewResult> {
-  return request(`/sessions/${sessionId}/agent/deep-review`, { method: 'POST' })
+export function deepReview(sessionId: string, useFallback = false): Promise<DeepReviewResult> {
+  return request(`/sessions/${sessionId}/agent/deep-review${useFallback ? '?use_fallback=true' : ''}`, { method: 'POST' })
 }
 
 export function generateTeachingCase(

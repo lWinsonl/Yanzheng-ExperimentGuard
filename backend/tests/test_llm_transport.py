@@ -8,6 +8,7 @@ import pytest
 
 from app.agent.llm_client import LlmClient
 from app.config import settings
+from app.agent.call_diagnostics import capture_call_diagnostics
 
 
 @pytest.fixture
@@ -90,3 +91,68 @@ def test_partial_output_is_not_adopted_as_complete(transport, monkeypatch, caplo
     }).encode()))
     assert client.chat("system", "user") is None
     assert "output truncated" in caplog.text
+
+
+@pytest.mark.parametrize("status,code,kind,retryable", [
+    (429, "1305", "provider_busy", True),
+    (429, "1302", "rate_limited", True),
+    (429, "1113", "account_limit", False),
+    (401, "1000", "authentication", False),
+    (403, "1220", "permission", False),
+])
+def test_failure_detail_is_safe_and_specific(transport, monkeypatch, status, code, kind, retryable):
+    client, _ = transport
+
+    def fail(request, timeout):
+        raise urllib.error.HTTPError(request.full_url, status, "error", {}, io.BytesIO(json.dumps({
+            "error": {"code": code, "message": "private submitted text test-only-secret"},
+        }).encode()))
+
+    monkeypatch.setattr(urllib.request, "urlopen", fail)
+    with capture_call_diagnostics() as diagnostics:
+        assert client.chat("system", "user") is None
+    assert diagnostics.requested_model == "glm-4.7-flash"
+    assert diagnostics.error.kind == kind
+    assert diagnostics.error.provider_code == code
+    assert diagnostics.error.retryable is retryable
+    assert "private" not in diagnostics.error.message
+    assert "secret" not in diagnostics.error.message
+
+
+def test_model_override_is_local_and_response_model_is_reported(transport):
+    client, calls = transport
+    with capture_call_diagnostics() as diagnostics:
+        client.chat("system", "user", model="glm-4-flash")
+    assert calls[0][0]["model"] == "glm-4-flash"
+    assert settings.llm_model == "glm-4.7-flash"
+    assert diagnostics.error is None
+    assert diagnostics.response_model == "glm-4.7-flash"  # The mock response, not a guess from the request.
+
+
+def test_concurrent_diagnostics_do_not_leak_between_requests(transport, monkeypatch):
+    from concurrent.futures import ThreadPoolExecutor
+    from threading import Barrier
+    client, _ = transport
+    barrier = Barrier(2)
+
+    def respond(request, timeout):
+        model = json.loads(request.data)["model"]
+        barrier.wait(timeout=5)
+        if model == "busy-model":
+            raise urllib.error.HTTPError(request.full_url, 429, "busy", {},
+                                         io.BytesIO(b'{"error":{"code":"1305"}}'))
+        return io.BytesIO(json.dumps({"model": model, "choices": [{"message": {"content": "ok"}}]}).encode())
+
+    monkeypatch.setattr(urllib.request, "urlopen", respond)
+
+    def run(model):
+        with capture_call_diagnostics() as diagnostics:
+            client.chat("system", "user", model=model)
+        return diagnostics
+
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        busy, good = list(executor.map(run, ("busy-model", "good-model")))
+    assert busy.error.kind == "provider_busy"
+    assert busy.requested_model == "busy-model"
+    assert good.error is None
+    assert good.requested_model == good.response_model == "good-model"

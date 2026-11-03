@@ -14,6 +14,7 @@ class Settings(BaseSettings):
     llm_api_key: str = ""
     llm_base_url: str = ""
     llm_model: str = ""
+    llm_fallback_model: str = ""
     llm_timeout_seconds: float = Field(default=60, gt=0, le=300)
     llm_review_timeout_seconds: float = Field(default=120, gt=0, le=300)
     llm_thinking: Literal["enabled", "disabled"] = "disabled"

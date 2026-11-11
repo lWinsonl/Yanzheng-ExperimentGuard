@@ -148,7 +148,7 @@ flowchart LR
 
 [部署到 Render](https://render.com/deploy?repo=https%3A%2F%2Fgithub.com%2FlWinsonl%2FYanzheng-ExperimentGuard) · [查看部署说明](docs/deployment.md)
 
-已提供 React + FastAPI 的单容器部署配置。Render 服务可配置公开评委账号：设置 `DEMO_USERNAME`、`DEMO_PASSWORD` 和随机 `DEMO_AUTH_SECRET` 后，访问者点击“进入评审演示”即可使用该公开账号，无需手动输入；三项留空时本地开发不启用登录。请只在 Render 的 Environment 中设置这些值，不要提交账号密码到 Git。本地 `.env` 不会自动迁移，模型配置也需在 Render 环境变量中另行设置；未配置模型时使用规则模式。Render 免费实例会休眠，会话和上传材料使用临时存储。仓库根目录的 `Dockerfile` 为单容器同源部署，也可用于其他支持容器的平台。
+已提供 React + FastAPI 的单容器部署配置。Render 服务可配置公开评委账号：设置 `DEMO_USERNAME`、`DEMO_PASSWORD` 和随机 `DEMO_AUTH_SECRET` 后，登录页保留账号和密码输入框，自动预填公开演示凭据；评委点击“登录并进入”即可，也可修改输入。三项留空时本地开发不启用登录。预填的演示密码会提供给所有访问者，请使用专门的公开演示密码，不要复用个人密码；`DEMO_AUTH_SECRET` 和模型 API Key 始终只保留在服务端。请在 Render 的 Environment 中设置这些值，不要提交到 Git。本地 `.env` 不会自动迁移，模型配置也需在 Render 环境变量中另行设置；未配置模型时使用规则模式。Render 免费实例会休眠，会话和上传材料使用临时存储。仓库根目录的 `Dockerfile` 为单容器同源部署，也可用于其他支持容器的平台。
 
 ## 本地启动
 

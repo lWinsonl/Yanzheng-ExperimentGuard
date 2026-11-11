@@ -69,7 +69,7 @@ class DemoAccess:
 
         if not request.url.path.startswith("/api/") or request.url.path == "/api/health":
             return await call_next(request)
-        if request.url.path in {"/api/auth/status", "/api/auth/login", "/api/auth/enter", "/api/auth/logout"}:
+        if request.url.path in {"/api/auth/status", "/api/auth/login", "/api/auth/logout"}:
             return await call_next(request)
         from app.api.auth import authenticated
         if not authenticated(request):

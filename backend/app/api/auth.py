@@ -32,6 +32,8 @@ def _signature(expires: int) -> str:
 def authenticated(request: Request) -> bool:
     if not is_configured():
         return True
+    if not (settings.demo_username and settings.demo_password and settings.demo_auth_secret):
+        return False
     token = request.cookies.get(COOKIE, "")
     try:
         raw_expires, signature = token.split(".", 1)
@@ -44,8 +46,14 @@ def authenticated(request: Request) -> bool:
 
 
 @router.get("/status")
-def status(request: Request):
-    return {"login_required": is_configured(), "authenticated": authenticated(request)}
+def status(request: Request, response: Response):
+    # These credentials belong only to the intentionally PUBLIC demo account.
+    # The signing secret and model API credentials must never be sent to clients.
+    response.headers["Cache-Control"] = "no-store"
+    ready = bool(settings.demo_username and settings.demo_password and settings.demo_auth_secret)
+    return {"login_required": is_configured(), "authenticated": authenticated(request),
+            "demo_username": settings.demo_username if ready else "",
+            "demo_password": settings.demo_password if ready else ""}
 
 
 @router.post("/login")
@@ -55,24 +63,11 @@ def login(payload: LoginRequest, request: Request, response: Response):
     if not (settings.demo_username and settings.demo_password and settings.demo_auth_secret):
         from fastapi import HTTPException
         raise HTTPException(status_code=503, detail="演示账号尚未完成服务端配置")
-    username_ok = hmac.compare_digest(payload.username, settings.demo_username)
-    password_ok = hmac.compare_digest(payload.password, settings.demo_password)
+    username_ok = hmac.compare_digest(payload.username.encode(), settings.demo_username.encode())
+    password_ok = hmac.compare_digest(payload.password.encode(), settings.demo_password.encode())
     if not (username_ok and password_ok):
         from fastapi import HTTPException
         raise HTTPException(status_code=401, detail="账号或密码不正确")
-    expires = int(time.time()) + TTL_SECONDS
-    token = f"{expires}.{_signature(expires)}"
-    response.set_cookie(COOKIE, token, httponly=True, secure=request.url.scheme == "https",
-                        samesite="strict", max_age=TTL_SECONDS, path="/")
-    return {"login_required": True, "authenticated": True}
-
-
-@router.post("/enter")
-def enter(request: Request, response: Response):
-    """One-click entry for the intentionally public competition demo account."""
-    if not (settings.demo_username and settings.demo_password and settings.demo_auth_secret):
-        from fastapi import HTTPException
-        raise HTTPException(status_code=503, detail="公开演示账号尚未完成服务端配置")
     expires = int(time.time()) + TTL_SECONDS
     token = f"{expires}.{_signature(expires)}"
     response.set_cookie(COOKIE, token, httponly=True, secure=request.url.scheme == "https",

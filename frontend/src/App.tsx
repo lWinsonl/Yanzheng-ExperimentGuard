@@ -203,7 +203,7 @@ function Workspace() {
   )
 }
 
-type AccessState = { login_required: boolean; authenticated: boolean }
+type AccessState = { login_required: boolean; authenticated: boolean; demo_username?: string; demo_password?: string }
 
 export default function App() {
   const [access, setAccess] = useState<AccessState | null>(null)
@@ -220,7 +220,8 @@ export default function App() {
 
   if (!access) return <main className="login-shell"><p className="muted">正在连接研证…</p></main>
   if (access.login_required && !access.authenticated) {
-    return <LoginPage onLoggedIn={() => setRefresh(value => value + 1)} />
+    return <LoginPage demoUsername={access.demo_username ?? ''} demoPassword={access.demo_password ?? ''}
+      onLoggedIn={() => setRefresh(value => value + 1)} />
   }
   return <Workspace />
 }

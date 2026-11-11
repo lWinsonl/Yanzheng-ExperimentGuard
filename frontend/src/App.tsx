@@ -7,6 +7,7 @@ import { FactConfirmPage } from './pages/FactConfirmPage'
 import { ReportPage } from './pages/ReportPage'
 import { RecheckPage } from './pages/RecheckPage'
 import { SessionHistory } from './components/SessionHistory'
+import { LoginPage } from './pages/LoginPage'
 
 type Step = 'setup' | 'upload' | 'facts' | 'report' | 'recheck'
 
@@ -39,7 +40,7 @@ function loadStep(): Step {
   } catch { return 'setup' }
 }
 
-export default function App() {
+function Workspace() {
   const [step, setStep] = useState<Step>(() => loadSession() ? loadStep() : 'setup')
   const [session, setSession] = useState<ReviewSession | null>(loadSession)
   const [showHistory, setShowHistory] = useState(false)
@@ -200,4 +201,26 @@ export default function App() {
       </footer>
     </div>
   )
+}
+
+type AccessState = { login_required: boolean; authenticated: boolean }
+
+export default function App() {
+  const [access, setAccess] = useState<AccessState | null>(null)
+  const [refresh, setRefresh] = useState(0)
+  useEffect(() => {
+    let active = true
+    fetch('/api/auth/status').then(async response => {
+      if (!response.ok) throw new Error('无法确认登录状态')
+      return response.json() as Promise<AccessState>
+    }).then(value => { if (active) setAccess(value) })
+      .catch(() => { if (active) setAccess({ login_required: true, authenticated: false }) })
+    return () => { active = false }
+  }, [refresh])
+
+  if (!access) return <main className="login-shell"><p className="muted">正在连接研证…</p></main>
+  if (access.login_required && !access.authenticated) {
+    return <LoginPage onLoggedIn={() => setRefresh(value => value + 1)} />
+  }
+  return <Workspace />
 }

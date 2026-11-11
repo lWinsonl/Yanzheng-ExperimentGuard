@@ -23,3 +23,9 @@ services:
         sync: false
       - key: LLM_MODEL
         sync: false
+      - key: DEMO_USERNAME
+        sync: false
+      - key: DEMO_PASSWORD
+        sync: false
+      - key: DEMO_AUTH_SECRET
+        sync: false

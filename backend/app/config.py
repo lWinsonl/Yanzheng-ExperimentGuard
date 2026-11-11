@@ -30,6 +30,11 @@ class Settings(BaseSettings):
     # 允许的来源(前端开发服务器;生产同源部署不触发 CORS)
     cors_origins: list[str] = ["http://localhost:5173"]
 
+    # Public competition demo login. Leave blank to disable the login gate locally.
+    demo_username: str = ""
+    demo_password: str = ""
+    demo_auth_secret: str = ""
+
     model_config = {"env_file": ".env", "env_file_encoding": "utf-8"}
 
 

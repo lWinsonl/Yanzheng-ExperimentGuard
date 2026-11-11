@@ -1,6 +1,7 @@
-from app.api import agent, claim_graph, facts, followup, materials, recheck, review, sessions, version_diff
+from app.api import agent, auth, claim_graph, facts, followup, materials, recheck, review, sessions, version_diff
 
 ALL_ROUTERS = [
+    auth.router,
     sessions.router,
     materials.router,
     facts.router,
